@@ -1,0 +1,42 @@
+datasource db {
+  provider = "postgresql" // or mysql/sqlite
+  url      = env("DATABASE_URL")
+  directUrl =  env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Scanner {
+  id        String    @id @default(cuid())
+  firstname      String
+  lastname       String
+  address         String
+  gender          String
+  birthdate         String
+  scans     ScanEvent[]
+  createdAt DateTime  @default(now())
+
+}
+
+model Product {
+  id        String    @id @default(cuid())
+  barcode   String    @unique
+  data      Json     
+  createdAt DateTime  @default(now())
+  scans     ScanEvent[]
+}
+
+model ScanEvent {
+  id          String    @id @default(cuid())
+  scanner     Scanner   @relation(fields: [scannerId], references: [id])
+  scannerId   String
+  product     Product?  @relation(fields: [productId], references: [id])
+  productId   String?
+  userId      String?
+  location    String?
+  latitude    Float?
+  longitude   Float?
+  scannedAt   DateTime  @default(now())
+}
