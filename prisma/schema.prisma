@@ -10,6 +10,9 @@ generator client {
 
 model Scanner {
   id        String    @id @default(cuid())
+  image        String?
+  username      String
+  password      String
   firstname      String
   lastname       String
   address         String
