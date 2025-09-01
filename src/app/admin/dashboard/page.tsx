@@ -1,3 +1,4 @@
+'use clientq'
 import React from 'react'
 
 const page = () => {
