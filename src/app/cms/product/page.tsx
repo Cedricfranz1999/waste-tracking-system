@@ -32,6 +32,7 @@ import {
 } from "~/components/ui/card";
 import { Plus, Edit, Trash2, Search, Loader2, Upload, X } from "lucide-react";
 import { api } from "~/trpc/react";
+import { uploadImage } from "~/lib/upload";
 
 const productSchema = z.object({
   image: z.string().optional(),
@@ -110,7 +111,6 @@ export default function ProductsPage() {
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
         setImagePreview(dataUrl);
-        form.setValue("image", dataUrl); // Set the base64 data URL directly
       };
       reader.readAsDataURL(file);
     }
@@ -135,14 +135,23 @@ export default function ProductsPage() {
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     try {
-      // The API will automatically encode all data to base64
+      // Upload image to Supabase if a new file is selected
+      let imageUrl = data.image;
+      if (selectedFile) {
+        imageUrl = await uploadImage(selectedFile);
+      }
+
       if (editingProduct) {
         await updateMutation.mutateAsync({
           id: editingProduct.id,
           ...data,
+          image: imageUrl,
         });
       } else {
-        await createMutation.mutateAsync(data);
+        await createMutation.mutateAsync({
+          ...data,
+          image: imageUrl,
+        });
       }
 
       await refetch();
