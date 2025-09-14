@@ -32,7 +32,6 @@ import {
 } from "~/components/ui/card";
 import { Plus, Edit, Trash2, Search, Loader2, Upload, X } from "lucide-react";
 import { api } from "~/trpc/react";
-import { uploadImage } from "~/lib/upload";
 
 const productSchema = z.object({
   image: z.string().optional(),
@@ -57,7 +56,6 @@ export default function ProductsPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -110,7 +108,9 @@ export default function ProductsPage() {
       // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result as string);
+        const dataUrl = e.target?.result as string;
+        setImagePreview(dataUrl);
+        form.setValue("image", dataUrl); // Set the base64 data URL directly
       };
       reader.readAsDataURL(file);
     }
@@ -125,19 +125,6 @@ export default function ProductsPage() {
     }
   };
 
-  const uploadImageToSupabase = async (file: File): Promise<string> => {
-    setIsUploading(true);
-    try {
-      const imageUrl = await uploadImage(file);
-      return imageUrl;
-    } catch (error) {
-      console.error("Error uploading image:", error);
-      throw new Error("Failed to upload image");
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
   const filteredProducts = products.filter(
     (product) =>
       product.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -148,25 +135,14 @@ export default function ProductsPage() {
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     try {
-      let imageUrl = data.image;
-
-      // Upload new image if selected
-      if (selectedFile) {
-        imageUrl = await uploadImageToSupabase(selectedFile);
-      }
-
-      const productData = {
-        ...data,
-        image: imageUrl,
-      };
-
+      // The API will automatically encode all data to base64
       if (editingProduct) {
         await updateMutation.mutateAsync({
           id: editingProduct.id,
-          ...productData,
+          ...data,
         });
       } else {
-        await createMutation.mutateAsync(productData);
+        await createMutation.mutateAsync(data);
       }
 
       await refetch();
@@ -280,13 +256,6 @@ export default function ProductsPage() {
                       </div>
                     )}
 
-                    {isUploading && (
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        Uploading image...
-                      </div>
-                    )}
-
                     {/* Hidden input for form validation */}
                     <Input type="hidden" {...form.register("image")} />
                   </div>
@@ -345,11 +314,8 @@ export default function ProductsPage() {
                     >
                       Cancel
                     </Button>
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting || isUploading}
-                    >
-                      {isSubmitting || isUploading ? (
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : null}
                       {editingProduct ? "Update" : "Create"} Product

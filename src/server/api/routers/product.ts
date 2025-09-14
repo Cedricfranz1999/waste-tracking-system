@@ -2,6 +2,15 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
 
+// Helper functions to encode/decode base64
+const encodeToBase64 = (str: string): string => {
+  return Buffer.from(str).toString("base64");
+};
+
+const decodeFromBase64 = (str: string): string => {
+  return Buffer.from(str, "base64").toString("utf8");
+};
+
 export const productRouter = createTRPCRouter({
   create: publicProcedure
     .input(
@@ -13,8 +22,18 @@ export const productRouter = createTRPCRouter({
       }),
     )
     .mutation(async ({ ctx, input }) => {
+      // Encode all string fields to base64 before storing
+      const encodedData = {
+        image: input.image ? encodeToBase64(input.image) : null,
+        barcode: encodeToBase64(input.barcode),
+        manufacturer: encodeToBase64(input.manufacturer),
+        description: input.description
+          ? encodeToBase64(input.description)
+          : null,
+      };
+
       const product = await ctx.db.product.create({
-        data: input,
+        data: encodedData,
       });
       return product;
     }),
@@ -23,7 +42,17 @@ export const productRouter = createTRPCRouter({
     const products = await ctx.db.product.findMany({
       orderBy: { createdAt: "desc" },
     });
-    return products;
+
+    // Decode all base64 fields for frontend display
+    return products.map((product) => ({
+      ...product,
+      image: product.image ? decodeFromBase64(product.image) : null,
+      barcode: decodeFromBase64(product.barcode),
+      manufacturer: decodeFromBase64(product.manufacturer),
+      description: product.description
+        ? decodeFromBase64(product.description)
+        : null,
+    }));
   }),
 
   getById: publicProcedure
@@ -38,7 +67,17 @@ export const productRouter = createTRPCRouter({
           message: "Product not found",
         });
       }
-      return product;
+
+      // Decode all base64 fields
+      return {
+        ...product,
+        image: product.image ? decodeFromBase64(product.image) : null,
+        barcode: decodeFromBase64(product.barcode),
+        manufacturer: decodeFromBase64(product.manufacturer),
+        description: product.description
+          ? decodeFromBase64(product.description)
+          : null,
+      };
     }),
 
   update: publicProcedure
@@ -53,9 +92,18 @@ export const productRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const { id, ...data } = input;
+
+      // Encode all string fields to base64
+      const encodedData = {
+        image: data.image ? encodeToBase64(data.image) : null,
+        barcode: encodeToBase64(data.barcode),
+        manufacturer: encodeToBase64(data.manufacturer),
+        description: data.description ? encodeToBase64(data.description) : null,
+      };
+
       const product = await ctx.db.product.update({
         where: { id },
-        data,
+        data: encodedData,
       });
       return product;
     }),
