@@ -5,7 +5,7 @@ import { persist, createJSONStorage } from "zustand/middleware";
 interface AdminUser {
   id: string;
   username: string;
-  type: "ADMIN";
+  type: "ADMIN" | "CMS";
   name?: string;
 }
 
