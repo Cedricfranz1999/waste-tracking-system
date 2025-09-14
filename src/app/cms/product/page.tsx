@@ -127,8 +127,8 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter(
     (product) =>
-      product.barcode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      product.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
@@ -367,19 +367,57 @@ export default function ProductsPage() {
                       {product.image && (
                         <img
                           src={product.image}
-                          alt={product.barcode}
                           className="h-10 w-10 rounded object-cover"
                         />
                       )}
                     </TableCell>
+
+                    {/* Barcode */}
                     <TableCell className="font-medium">
-                      {product.barcode}
+                      {product.barcode === "Edited Data" ? (
+                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
+                          {product.barcode}
+                        </p>
+                      ) : (
+                        product.barcode
+                      )}
                     </TableCell>
-                    <TableCell>{product.manufacturer}</TableCell>
-                    <TableCell>{product.description}</TableCell>
+
+                    {/* Manufacturer */}
                     <TableCell>
-                      {product.createdAt.toLocaleDateString()}
+                      {product.manufacturer === "Edited Data" ? (
+                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
+                          {product.manufacturer}
+                        </p>
+                      ) : (
+                        product.manufacturer
+                      )}
                     </TableCell>
+
+                    {/* Description */}
+                    <TableCell>
+                      {product.description === "Edited Data" ? (
+                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
+                          {product.description}
+                        </p>
+                      ) : (
+                        product.description
+                      )}
+                    </TableCell>
+
+                    {/* CreatedAt */}
+                    <TableCell>
+                      {product.createdAt.toLocaleDateString() ===
+                      "Edited Data" ? (
+                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
+                          {product.createdAt.toLocaleDateString()}
+                        </p>
+                      ) : (
+                        product.createdAt.toLocaleDateString()
+                      )}
+                    </TableCell>
+
+                    {/* Actions */}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
