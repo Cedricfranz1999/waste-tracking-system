@@ -1,21 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '~/server/db';
-
-interface RouteParams {
-  params: {
-    randomPath: string;
-  };
-}
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "~/server/db";
 
 // Base64 decoding utility for backend
 const decodeFromBase64 = (encoded: string): string => {
-  return decodeURIComponent(escape(Buffer.from(encoded, 'base64').toString('utf8')));
+  return decodeURIComponent(
+    escape(Buffer.from(encoded, "base64").toString("utf8")),
+  );
 };
 
 const decodeObjectFromBase64 = (obj: any): any => {
   const decoded: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value && key !== 'image') {
+    if (typeof value === "string" && value && key !== "image") {
       try {
         decoded[key] = decodeFromBase64(value);
       } catch {
@@ -30,13 +26,15 @@ const decodeObjectFromBase64 = (obj: any): any => {
 
 // Base64 encoding utility for backend
 const encodeToBase64 = (data: string): string => {
-  return Buffer.from(unescape(encodeURIComponent(data)), 'utf8').toString('base64');
+  return Buffer.from(unescape(encodeURIComponent(data)), "utf8").toString(
+    "base64",
+  );
 };
 
 const encodeObjectToBase64 = (obj: any): any => {
   const encoded: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value && key !== 'image') {
+    if (typeof value === "string" && value && key !== "image") {
       encoded[key] = encodeToBase64(value);
     } else {
       encoded[key] = value;
@@ -45,96 +43,90 @@ const encodeObjectToBase64 = (obj: any): any => {
   return encoded;
 };
 
-export async function GET(request: NextRequest, { params }: RouteParams) {
+export async function GET(request: NextRequest) {
   try {
-    const { randomPath } = params;
-    
     const scanners = await db.scanner.findMany({
-     
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
-    
-    // Decode all scanner data from Base64 before sending to frontend
-    const decodedScanners = scanners.map(scanner => decodeObjectFromBase64(scanner));
-    
+
+    const decodedScanners = scanners.map((scanner) =>
+      decodeObjectFromBase64(scanner),
+    );
+
     return NextResponse.json(decodedScanners);
   } catch (error) {
-    console.error('GET error:', error);
+    console.error("GET error:", error);
     return NextResponse.json(
-      { error: 'Failed to fetch scanners' },
-      { status: 500 }
+      { error: "Failed to fetch scanners" },
+      { status: 500 },
     );
   }
 }
 
-export async function POST(request: NextRequest, { params }: RouteParams) {
+export async function POST(request: NextRequest) {
   try {
-    const { randomPath } = params;
     const body = await request.json();
-    
-    // Encode the incoming data to Base64 before storing
     const encodedData = encodeObjectToBase64(body);
-    
+
     const scanner = await db.scanner.create({
-      data: {
-        ...encodedData,
-        path: randomPath,
-      },
+      data: encodedData,
     });
-    
+
     return NextResponse.json(scanner, { status: 201 });
   } catch (error) {
-    console.error('POST error:', error);
+    console.error("POST error:", error);
     return NextResponse.json(
-      { error: 'Failed to create scanner' },
-      { status: 500 }
+      { error: "Failed to create scanner" },
+      { status: 500 },
     );
   }
 }
 
-export async function PUT(request: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }, // Changed from randomPath to id
+) {
   try {
-    const { randomPath } = params;
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    
+    const { id } = await params; // Now using id directly from params
+
     if (!id) {
       return NextResponse.json(
-        { error: 'Scanner ID is required' },
-        { status: 400 }
+        { error: "Scanner ID is required" },
+        { status: 400 },
       );
     }
 
     const body = await request.json();
-    
+
     // Encode the incoming data to Base64 before updating
     const encodedData = encodeObjectToBase64(body);
-    
+
     const scanner = await db.scanner.update({
       where: { id },
       data: encodedData,
     });
-    
+
     return NextResponse.json(scanner);
   } catch (error) {
-    console.error('PUT error:', error);
+    console.error("PUT error:", error);
     return NextResponse.json(
-      { error: 'Failed to update scanner' },
-      { status: 500 }
+      { error: "Failed to update scanner" },
+      { status: 500 },
     );
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }, // Changed from randomPath to id
+) {
   try {
-    const { randomPath } = params;
-    const { searchParams } = new URL(request.url);
-    const id = searchParams.get('id');
-    
+    const { id } = await params; // Now using id directly from params
+
     if (!id) {
       return NextResponse.json(
-        { error: 'Scanner ID is required' },
-        { status: 400 }
+        { error: "Scanner ID is required" },
+        { status: 400 },
       );
     }
 
@@ -143,22 +135,19 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     });
 
     if (!scanner) {
-      return NextResponse.json(
-        { error: 'Scanner not found' },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Scanner not found" }, { status: 404 });
     }
 
     await db.scanner.delete({
       where: { id },
     });
-    
-    return NextResponse.json({ message: 'Scanner deleted successfully' });
+
+    return NextResponse.json({ message: "Scanner deleted successfully" });
   } catch (error) {
-    console.error('DELETE error:', error);
+    console.error("DELETE error:", error);
     return NextResponse.json(
-      { error: 'Failed to delete scanner' },
-      { status: 500 }
+      { error: "Failed to delete scanner" },
+      { status: 500 },
     );
   }
 }

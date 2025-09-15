@@ -1,37 +1,28 @@
-// src/app/api/scanners/[id]/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { db } from '~/server/db';
+// src/app/api/encrypt/[id]/route.ts
+import { NextRequest, NextResponse } from "next/server";
 
-interface RouteParams {
-  params: {
-    id: string;
-  };
-}
-
-export async function DELETE(request: NextRequest, { params }: RouteParams) {
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }, // Change randomPath to id
+) {
   try {
-    const { id } = params;
-    
+    const { id } = await params; // Now this will work correctly
+
     if (!id) {
-      return NextResponse.json(
-        { error: 'Scanner ID is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "ID is required" }, { status: 400 });
     }
 
-    await db.scanner.delete({
-      where: { id },
-    });
-    
-    return NextResponse.json({ 
-      message: 'Scanner deleted successfully',
-      deletedId: id 
+    // Your encryption logic here...
+
+    return NextResponse.json({
+      message: "Encryption successful",
+      id: id,
     });
   } catch (error) {
-    console.error('DELETE error:', error);
+    console.error("PUT error:", error);
     return NextResponse.json(
-      { error: 'Failed to delete scanner' },
-      { status: 500 }
+      { error: "Failed to process encryption" },
+      { status: 500 },
     );
   }
 }
