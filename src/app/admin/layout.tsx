@@ -1,21 +1,35 @@
 "use client";
 import { Toaster } from "~/components/ui/toaster";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
+import { useAuthStore } from "~/auths-store";
 
 const AdminLayout = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
 
-  // useEffect(() => {
-  //   const adminData = localStorage.getItem("adminData");
-  //   if (!adminData) {
-  //     router.push("/adminLogin");
-  //   }
-  // }, [router]);
+  const [mounted, setMounted] = useState(false);
+  const role = useAuthStore((state) => state?.user?.type);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
+
+    if (role === "ADMIN") {
+      router.push("/admin/scanner");
+    } else {
+      router.push("/cms-login");
+    }
+  }, [mounted, role, router]);
+
+  if (!mounted) {
+    return null;
+  }
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -28,17 +42,15 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
         <div className="z-30">
           <Header />
         </div>
-        
-        <div className="flex flex-1 relative">
+
+        <div className="relative flex flex-1">
           {/* Sidebar with higher z-index and fixed positioning */}
           <div className="fixed inset-y-0 left-0 z-40 hidden md:block">
             <Sidebar />
           </div>
-          
+
           {/* Main content with padding to account for sidebar */}
-          <main className="flex-1 p-4 md:p-6 md:ml-64 mt-14">
-            {children}
-          </main>
+          <main className="mt-14 flex-1 p-4 md:ml-64 md:p-6">{children}</main>
         </div>
       </div>
       <Toaster />

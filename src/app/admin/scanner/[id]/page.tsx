@@ -41,7 +41,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
-import { Loader2, Save, X, Edit, MoreHorizontal, Trash2, QrCode, Plus, Upload, ImageIcon } from "lucide-react";
+import {
+  Loader2,
+  Save,
+  X,
+  Edit,
+  MoreHorizontal,
+  Trash2,
+  QrCode,
+  Plus,
+  Upload,
+  ImageIcon,
+} from "lucide-react";
 
 interface Scanner {
   id?: string;
@@ -60,15 +71,13 @@ interface Scanner {
 const encodeToBase64 = (data: string): string => {
   return btoa(unescape(encodeURIComponent(data)));
 };
-
 const decodeFromBase64 = (encoded: string): string => {
   return decodeURIComponent(escape(atob(encoded)));
 };
-
 const encodeObjectToBase64 = (obj: any): any => {
   const encoded: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value && key !== 'image') {
+    if (typeof value === "string" && value && key !== "image") {
       encoded[key] = encodeToBase64(value);
     } else {
       encoded[key] = value;
@@ -76,11 +85,10 @@ const encodeObjectToBase64 = (obj: any): any => {
   }
   return encoded;
 };
-
 const decodeObjectFromBase64 = (obj: any): any => {
   const decoded: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (typeof value === 'string' && value && key !== 'image') {
+    if (typeof value === "string" && value && key !== "image") {
       try {
         decoded[key] = decodeFromBase64(value);
       } catch {
@@ -94,18 +102,37 @@ const decodeObjectFromBase64 = (obj: any): any => {
 };
 
 // Function to generate random string with all keyboard characters
-// eslint-disable-next-line @typescript-eslint/no-inferrable-types
 const generateRandomPath = (length: number = 100): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
-  let result = '';
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
+  let result = "";
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return result;
 };
 
+// Retry function for fetch
+const fetchWithRetry = async (
+  url: string,
+  options: RequestInit,
+  retries: number = 3,
+  delay: number = 1000,
+): Promise<Response> => {
+  try {
+    const res = await fetch(url, options);
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    return res;
+  } catch (error) {
+    if (retries <= 0) throw error;
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    return fetchWithRetry(url, options, retries - 1, delay);
+  }
+};
+
 export default function Page() {
-  const [randomPath, setRandomPath] = useState<string>('');
+  const [randomPath, setRandomPath] = useState<string>("");
+  const [fetchAttempted, setFetchAttempted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [scanners, setScanners] = useState<Scanner[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -115,8 +142,7 @@ export default function Page() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-
-  const [formData, setFormData] = useState<Omit<Scanner, 'id' | 'createdAt'>>({
+  const [formData, setFormData] = useState<Omit<Scanner, "id" | "createdAt">>({
     username: "",
     password: "",
     firstname: "",
@@ -127,30 +153,40 @@ export default function Page() {
     image: "",
   });
 
-  // Generate random path on component mount
+  // Generate or retrieve random path on component mount
   useEffect(() => {
-    const path = generateRandomPath();
-    setRandomPath(path);
+    const storedPath = localStorage.getItem("scannerPath");
+    if (storedPath) {
+      setRandomPath(storedPath);
+    } else {
+      const path = generateRandomPath();
+      localStorage.setItem("scannerPath", path);
+      setRandomPath(path);
+    }
   }, []);
 
   const fetchScanners = async () => {
     if (!randomPath) return;
-
     try {
       setIsLoadingPage(true);
-      const res = await fetch(`/api/encrypt/${randomPath}`);
-      if (res.ok) {
-        const data = await res.json();
-        // Decode all scanner data from Base64
-        const decodedScanners = data.map((scanner: any) => decodeObjectFromBase64(scanner));
+      const res = await fetchWithRetry(`/api/encrypt/${randomPath}`, {
+        method: "GET",
+      });
+      const data = await res.json();
+      if (Array.isArray(data)) {
+        const decodedScanners = data.map((scanner: any) =>
+          decodeObjectFromBase64(scanner),
+        );
         setScanners(decodedScanners);
       } else {
-        console.error('Failed to fetch scanners');
+        setScanners([]);
       }
     } catch (error) {
-      console.error('Fetch error:', error);
+      console.error("Fetch error after retries:", error);
+      setScanners([]);
     } finally {
       setIsLoadingPage(false);
+      setFetchAttempted(true);
     }
   };
 
@@ -163,56 +199,45 @@ export default function Page() {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file");
       return;
     }
-
     if (file.size > 2 * 1024 * 1024) {
-      alert('Image size should be less than 2MB');
+      alert("Image size should be less than 2MB");
       return;
     }
-
     setIsUploading(true);
     const reader = new FileReader();
-    
     reader.onload = (event) => {
       const base64 = event.target?.result as string;
-      setFormData(prev => ({ ...prev, image: base64 }));
+      setFormData((prev) => ({ ...prev, image: base64 }));
       setIsUploading(false);
     };
-    
     reader.onerror = () => {
-      alert('Error reading file');
+      alert("Error reading file");
       setIsUploading(false);
     };
-    
     reader.readAsDataURL(file);
   };
 
   const handleRemoveImage = () => {
-    setFormData(prev => ({ ...prev, image: "" }));
+    setFormData((prev) => ({ ...prev, image: "" }));
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
     try {
-      // Encode form data to Base64 before sending
       const encodedFormData = encodeObjectToBase64(formData);
-      
       const encodedPath = encodeURIComponent(randomPath);
-      const url = editingScanner?.id 
+      const url = editingScanner?.id
         ? `/api/encrypt/${encodedPath}?id=${editingScanner.id}`
         : `/api/encrypt/${encodedPath}`;
-      
       const method = editingScanner?.id ? "PUT" : "POST";
-
       const response = await fetch(url, {
         method,
         headers: {
@@ -220,7 +245,6 @@ export default function Page() {
         },
         body: JSON.stringify(encodedFormData),
       });
-
       if (response.ok) {
         setFormData({
           username: "",
@@ -234,12 +258,14 @@ export default function Page() {
         });
         setEditingScanner(null);
         setIsFormDialogOpen(false);
-        fetchScanners();
+        await fetchScanners();
       } else {
-        console.error('Failed to save scanner');
+        console.error("Failed to save scanner");
+        alert("Failed to save scanner. Please try again.");
       }
     } catch (error) {
-      console.error('Submit error:', error);
+      console.error("Submit error:", error);
+      alert("An error occurred while saving. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -247,22 +273,25 @@ export default function Page() {
 
   const handleDelete = async () => {
     if (!deletingScanner?.id) return;
-
     try {
       const encodedPath = encodeURIComponent(randomPath);
-      const response = await fetch(`/api/encrypt/${encodedPath}?id=${deletingScanner.id}`, {
-        method: "DELETE",
-      });
-
+      const response = await fetch(
+        `/api/encrypt/${encodedPath}?id=${deletingScanner.id}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (response.ok) {
-        fetchScanners();
+        await fetchScanners();
         setIsDeleteDialogOpen(false);
         setDeletingScanner(null);
       } else {
-        console.error('Failed to delete scanner');
+        console.error("Failed to delete scanner");
+        alert("Failed to delete scanner. Please try again.");
       }
     } catch (error) {
-      console.error('Delete error:', error);
+      console.error("Delete error:", error);
+      alert("An error occurred while deleting. Please try again.");
     }
   };
 
@@ -279,7 +308,7 @@ export default function Page() {
       image: "",
     });
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
     setIsFormDialogOpen(true);
   };
@@ -312,7 +341,7 @@ export default function Page() {
       image: "",
     });
     if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+      fileInputRef.current.value = "";
     }
     setIsFormDialogOpen(false);
   };
@@ -326,43 +355,68 @@ export default function Page() {
 
   const handleRegeneratePath = () => {
     const newPath = generateRandomPath();
+    localStorage.setItem("scannerPath", newPath);
     setRandomPath(newPath);
   };
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoadingPage(false);
-    }, 10000);
-
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (isLoadingPage) {
+  if (isLoadingPage || !randomPath) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex min-h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
         <span className="ml-2">Loading scanners...</span>
       </div>
     );
   }
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-teal-800">Scanner Management</h1>
+  if (fetchAttempted && scanners.length === 0) {
+    return (
+      <div className="space-y-6 p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-teal-800">
+              Scanner Management
+            </h1>
+          </div>
+          <div className="flex space-x-2">
+            <Button
+              className="bg-teal-600 hover:bg-teal-700"
+              onClick={handleAddNew}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Add Scanner
+            </Button>
+          </div>
         </div>
-        <Button 
-          className="bg-teal-600 hover:bg-teal-700"
-          onClick={handleAddNew}
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Add Scanner
-        </Button>
+        <div className="rounded-lg bg-white p-6 shadow-md">
+          <div className="py-12 text-center text-gray-500">
+            <QrCode className="mx-auto mb-4 h-12 w-12" />
+            <p>No scanners found. Add your first scanner to get started.</p>
+          </div>
+        </div>
       </div>
+    );
+  }
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Scanner List</h2>
+  return (
+    <div className="space-y-6 p-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-teal-800">
+            Scanner Management
+          </h1>
+        </div>
+        <div className="flex space-x-2">
+          <Button
+            className="bg-teal-600 hover:bg-teal-700"
+            onClick={handleAddNew}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Add Scanner
+          </Button>
+        </div>
+      </div>
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <h2 className="mb-4 text-xl font-semibold">Scanner List</h2>
         {scanners.length > 0 ? (
           <Table>
             <TableHeader>
@@ -384,10 +438,10 @@ export default function Page() {
                       <img
                         src={scanner.image}
                         alt={`${scanner.firstname} ${scanner.lastname}`}
-                        className="w-10 h-10 rounded-full object-cover"
+                        className="h-10 w-10 rounded-full object-cover"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-teal-100">
                         <ImageIcon className="h-5 w-5 text-teal-600" />
                       </div>
                     )}
@@ -409,9 +463,7 @@ export default function Page() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => handleEdit(scanner)}
-                        >
+                        <DropdownMenuItem onClick={() => handleEdit(scanner)}>
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
@@ -432,28 +484,25 @@ export default function Page() {
             </TableBody>
           </Table>
         ) : (
-          <div className="text-center py-12 text-gray-500">
-            <QrCode className="mx-auto h-12 w-12 mb-4" />
+          <div className="py-12 text-center text-gray-500">
+            <QrCode className="mx-auto mb-4 h-12 w-12" />
             <p>No scanners found. Add your first scanner to get started.</p>
           </div>
         )}
       </div>
-
       {/* Form Dialog */}
       <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingScanner ? "Edit Scanner" : "Add New Scanner"}
             </DialogTitle>
             <DialogDescription>
-              {editingScanner 
-                ? "Update the scanner information below." 
-                : "Fill in the details to add a new scanner."
-              }
+              {editingScanner
+                ? "Update the scanner information below."
+                : "Fill in the details to add a new scanner."}
             </DialogDescription>
           </DialogHeader>
-
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Image Upload Section */}
             <div className="space-y-2">
@@ -464,7 +513,7 @@ export default function Page() {
                     <img
                       src={formData.image}
                       alt="Preview"
-                      className="w-32 h-32 rounded-full object-cover border-2 border-teal-200"
+                      className="h-32 w-32 rounded-full border-2 border-teal-200 object-cover"
                     />
                     <Button
                       type="button"
@@ -477,11 +526,10 @@ export default function Page() {
                     </Button>
                   </div>
                 ) : (
-                  <div className="w-32 h-32 rounded-full border-2 border-dashed border-teal-300 flex items-center justify-center">
+                  <div className="flex h-32 w-32 items-center justify-center rounded-full border-2 border-dashed border-teal-300">
                     <ImageIcon className="h-8 w-8 text-teal-400" />
                   </div>
                 )}
-                
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -490,7 +538,6 @@ export default function Page() {
                   onChange={handleImageUpload}
                   className="hidden"
                 />
-                
                 <Button
                   type="button"
                   variant="outline"
@@ -502,15 +549,13 @@ export default function Page() {
                   ) : (
                     <Upload className="mr-2 h-4 w-4" />
                   )}
-                  {formData.image ? 'Change Image' : 'Upload Image'}
+                  {formData.image ? "Change Image" : "Upload Image"}
                 </Button>
-                
-                <p className="text-xs text-gray-500 text-center">
+                <p className="text-center text-xs text-gray-500">
                   JPG, PNG or GIF (Max 2MB)
                 </p>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstname">First Name</Label>
@@ -522,7 +567,6 @@ export default function Page() {
                   required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="lastname">Last Name</Label>
                 <Input
@@ -534,7 +578,6 @@ export default function Page() {
                 />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
@@ -546,7 +589,6 @@ export default function Page() {
                   required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
@@ -559,7 +601,6 @@ export default function Page() {
                 />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
               <Input
@@ -570,13 +611,14 @@ export default function Page() {
                 required
               />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="gender">Gender</Label>
                 <Select
                   value={formData.gender}
-                  onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                  onValueChange={(value) =>
+                    setFormData({ ...formData, gender: value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select gender" />
@@ -588,7 +630,6 @@ export default function Page() {
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="birthdate">Birthdate</Label>
                 <Input
@@ -601,7 +642,6 @@ export default function Page() {
                 />
               </div>
             </div>
-
             <div className="flex justify-end space-x-2 pt-4">
               <Button type="button" variant="outline" onClick={handleCancel}>
                 <X className="mr-2 h-4 w-4" />
@@ -619,20 +659,26 @@ export default function Page() {
           </form>
         </DialogContent>
       </Dialog>
-
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <AlertDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the scanner
+              This action cannot be undone. This will permanently delete the
+              scanner
               {deletingScanner?.firstname} {deletingScanner?.lastname}.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
