@@ -22,8 +22,8 @@ const Page = () => {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const login = useAuthStore((state:any) => state.login);
-const adminLogin = api.auth.adminLogin.useMutation();
+  const login = useAuthStore((state: any) => state.login);
+  const adminLogin = api.auth.adminLogin.useMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +47,7 @@ const adminLogin = api.auth.adminLogin.useMutation();
           result.token,
         );
 
-        router.push("/admin/dashboard");
+        router.push("/admin/scanner");
       } else {
         setError("Login failed");
       }
@@ -102,10 +102,7 @@ const adminLogin = api.auth.adminLogin.useMutation();
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.7, duration: 0.5 }}
-            >
-              
-           
-            </motion.div>
+            ></motion.div>
             <motion.div
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -254,7 +251,7 @@ const adminLogin = api.auth.adminLogin.useMutation();
             <div>
               <Button
                 type="submit"
-                className="h-12 w-full transform rounded-xl  bg-[#477125] font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:from-emerald-700 hover:to-emerald-800 hover:shadow-xl active:scale-98 disabled:transform-none disabled:hover:shadow-lg"
+                className="h-12 w-full transform rounded-xl bg-[#477125] font-semibold text-white shadow-lg transition-all duration-200 hover:scale-[1.02] hover:from-emerald-700 hover:to-emerald-800 hover:shadow-xl active:scale-98 disabled:transform-none disabled:hover:shadow-lg"
                 disabled={isLoading}
               >
                 {isLoading ? (

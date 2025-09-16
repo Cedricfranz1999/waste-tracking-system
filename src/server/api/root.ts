@@ -2,6 +2,7 @@ import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
 import { authRouter } from "./routers/auth";
 import { cmsRouter } from "./routers/cms";
 import { productRouter } from "./routers/product";
+import { scannerRouter } from "./scanner";
 
 /**
  * This is the primary router for your server.
@@ -12,6 +13,7 @@ export const appRouter = createTRPCRouter({
   auth: authRouter,
   cms: cmsRouter,
   product: productRouter,
+  scanner: scannerRouter,
 });
 
 // export type definition of API

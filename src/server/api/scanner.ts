@@ -1,4 +1,4 @@
-// In your productRouter file
+// In your scannerRouter file
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
@@ -76,14 +76,18 @@ const validateEncodedData = (field: string | null): boolean => {
   }
 };
 
-export const productRouter = createTRPCRouter({
+export const scannerRouter = createTRPCRouter({
   create: publicProcedure
     .input(
       z.object({
         image: z.string().optional(),
-        barcode: z.string(),
-        manufacturer: z.string(),
-        description: z.string().optional(),
+        username: z.string(),
+        password: z.string(),
+        firstname: z.string(),
+        lastname: z.string(),
+        address: z.string(),
+        gender: z.string(),
+        birthdate: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -91,62 +95,74 @@ export const productRouter = createTRPCRouter({
         image: input.image
           ? JSON.stringify(encodeToBase64WithMarkers(input.image))
           : null,
-        barcode: JSON.stringify(encodeToBase64WithMarkers(input.barcode)),
-        manufacturer: JSON.stringify(
-          encodeToBase64WithMarkers(input.manufacturer),
-        ),
-        description: input.description
-          ? JSON.stringify(encodeToBase64WithMarkers(input.description))
-          : null,
+        username: JSON.stringify(encodeToBase64WithMarkers(input.username)),
+        password: JSON.stringify(encodeToBase64WithMarkers(input.password)),
+        firstname: JSON.stringify(encodeToBase64WithMarkers(input.firstname)),
+        lastname: JSON.stringify(encodeToBase64WithMarkers(input.lastname)),
+        address: JSON.stringify(encodeToBase64WithMarkers(input.address)),
+        gender: JSON.stringify(encodeToBase64WithMarkers(input.gender)),
+        birthdate: JSON.stringify(encodeToBase64WithMarkers(input.birthdate)),
       };
 
-      return ctx.db.product.create({ data: encodedData });
+      return ctx.db.scanner.create({ data: encodedData });
     }),
 
   getAll: publicProcedure.query(async ({ ctx }) => {
-    const products = await ctx.db.product.findMany({
+    const scanners = await ctx.db.scanner.findMany({
       orderBy: { createdAt: "desc" },
     });
 
-    return products.map((product) => ({
-      ...product,
-      image: safeDecode(product.image),
-      barcode: safeDecode(product.barcode),
-      manufacturer: safeDecode(product.manufacturer),
-      description: safeDecode(product.description),
+    return scanners.map((scanner) => ({
+      ...scanner,
+      image: safeDecode(scanner.image),
+      username: safeDecode(scanner.username),
+      password: safeDecode(scanner.password),
+      firstname: safeDecode(scanner.firstname),
+      lastname: safeDecode(scanner.lastname),
+      address: safeDecode(scanner.address),
+      gender: safeDecode(scanner.gender),
+      birthdate: safeDecode(scanner.birthdate),
     }));
   }),
 
   getById: publicProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      const product = await ctx.db.product.findUnique({
+      const scanner = await ctx.db.scanner.findUnique({
         where: { id: input.id },
       });
 
-      if (!product) {
+      if (!scanner) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Product not found",
+          message: "Scanner not found",
         });
       }
 
       // Validate data integrity before returning
-      const decodedProduct = {
-        ...product,
-        image: safeDecode(product.image),
-        barcode: safeDecode(product.barcode),
-        manufacturer: safeDecode(product.manufacturer),
-        description: safeDecode(product.description),
+      const decodedScanner = {
+        ...scanner,
+        image: safeDecode(scanner.image),
+        username: safeDecode(scanner.username),
+        password: safeDecode(scanner.password),
+        firstname: safeDecode(scanner.firstname),
+        lastname: safeDecode(scanner.lastname),
+        address: safeDecode(scanner.address),
+        gender: safeDecode(scanner.gender),
+        birthdate: safeDecode(scanner.birthdate),
       };
 
       // Check if any field has validation errors
       const validationErrors = [
-        decodedProduct.image,
-        decodedProduct.barcode,
-        decodedProduct.manufacturer,
-        decodedProduct.description,
-      ].some((value) => value?.includes("Invalid data"));
+        decodedScanner.image,
+        decodedScanner.username,
+        decodedScanner.password,
+        decodedScanner.firstname,
+        decodedScanner.lastname,
+        decodedScanner.address,
+        decodedScanner.gender,
+        decodedScanner.birthdate,
+      ].some((value) => value?.includes("Edited Data"));
 
       if (validationErrors) {
         throw new TRPCError({
@@ -155,7 +171,7 @@ export const productRouter = createTRPCRouter({
         });
       }
 
-      return decodedProduct;
+      return decodedScanner;
     }),
 
   update: publicProcedure
@@ -163,9 +179,13 @@ export const productRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         image: z.string().optional(),
-        barcode: z.string(),
-        manufacturer: z.string(),
-        description: z.string().optional(),
+        username: z.string(),
+        password: z.string(),
+        firstname: z.string(),
+        lastname: z.string(),
+        address: z.string(),
+        gender: z.string(),
+        birthdate: z.string(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -175,21 +195,21 @@ export const productRouter = createTRPCRouter({
         image: data.image
           ? JSON.stringify(encodeToBase64WithMarkers(data.image))
           : null,
-        barcode: JSON.stringify(encodeToBase64WithMarkers(data.barcode)),
-        manufacturer: JSON.stringify(
-          encodeToBase64WithMarkers(data.manufacturer),
-        ),
-        description: data.description
-          ? JSON.stringify(encodeToBase64WithMarkers(data.description))
-          : null,
+        username: JSON.stringify(encodeToBase64WithMarkers(data.username)),
+        password: JSON.stringify(encodeToBase64WithMarkers(data.password)),
+        firstname: JSON.stringify(encodeToBase64WithMarkers(data.firstname)),
+        lastname: JSON.stringify(encodeToBase64WithMarkers(data.lastname)),
+        address: JSON.stringify(encodeToBase64WithMarkers(data.address)),
+        gender: JSON.stringify(encodeToBase64WithMarkers(data.gender)),
+        birthdate: JSON.stringify(encodeToBase64WithMarkers(data.birthdate)),
       };
 
-      return ctx.db.product.update({ where: { id }, data: encodedData });
+      return ctx.db.scanner.update({ where: { id }, data: encodedData });
     }),
 
   delete: publicProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.db.product.delete({ where: { id: input.id } });
+      return ctx.db.scanner.delete({ where: { id: input.id } });
     }),
 });

@@ -63,7 +63,7 @@ model ScanEvent {
 
 model VerificationCode {
   id          String    @id @default(cuid())
-  email       String    @unique
+  email       String  
   code        String
   requestAt   DateTime?    @updatedAt
 }

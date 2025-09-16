@@ -62,9 +62,24 @@ const Sidebar = () => {
             <motion.div whileHover={{ scale: 1.02 }}>
               <div className="flex items-center justify-between">
                 <Link
-                  href="/product"
+                  href="/cms/dashboard"
                   className={`flex flex-1 items-center gap-3 rounded-lg px-3 py-2 transition-all ${
-                    isActive("/product")
+                    isActive("/cms/dashboard")
+                      ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg"
+                      : "text-white hover:bg-teal-600/80 hover:text-white"
+                  }`}
+                >
+                  <Barcode className="h-4 w-4" />
+                  Dashboard
+                </Link>
+              </div>
+            </motion.div>
+            <motion.div whileHover={{ scale: 1.02 }}>
+              <div className="flex items-center justify-between">
+                <Link
+                  href="/cms/product"
+                  className={`flex flex-1 items-center gap-3 rounded-lg px-3 py-2 transition-all ${
+                    isActive("/cms/product")
                       ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg"
                       : "text-white hover:bg-teal-600/80 hover:text-white"
                   }`}

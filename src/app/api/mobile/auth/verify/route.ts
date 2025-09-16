@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { sendVerifyEmail } from '~/lib/mailer';
 import { db } from '~/server/db';
 import jwt from 'jsonwebtoken'
+import { encodeToBase64WithMarkers } from '~/utils/string';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,12 +17,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, message: "Verification code does not matched" }, { status: 400 })
     }
 
-    const { code, ...rest } = payload
-    const user = await db.scanner.create({
+    const { code, password, ...payloadRest } = payload
+    await db.scanner.create({
       data: {
-        ...rest,
         verifyAt: new Date().toISOString(),
-        password: bcrypt.hashSync(payload?.password, 10)
+        username: JSON.stringify(encodeToBase64WithMarkers(payload.email)),
+        password: JSON.stringify(encodeToBase64WithMarkers(payload.password)),
+        firstname: JSON.stringify(encodeToBase64WithMarkers(payload.firstname)),
+        lastname: JSON.stringify(encodeToBase64WithMarkers(payload.lastname)),
+        address: JSON.stringify(encodeToBase64WithMarkers(payload.address)),
+        gender: JSON.stringify(encodeToBase64WithMarkers(payload.gender)),
+        birthdate: JSON.stringify(encodeToBase64WithMarkers(payload.birthdate)),
       }
     })
 
@@ -29,18 +35,18 @@ export async function POST(req: NextRequest) {
       where: { id: verificaton.id }
     })
 
-    const { password, ...userRest } = user
     const secret = process.env.JWT_SECRET || 'secret'
-    const token = jwt.sign(userRest, secret, {
+    const token = jwt.sign(payloadRest, secret, {
       expiresIn: '7d'
     })
 
     return NextResponse.json({
       ok: true,
       token: token,
-      userRest,
+      user: payloadRest,
     })
   } catch (error) {
+    console.log(error)
     return NextResponse.json(error, { status: 500 })
   }
 }
@@ -62,12 +68,25 @@ export async function GET(req: NextRequest) {
 
     const code = (Math.floor(100000 + Math.random() * 900000)).toString()
 
-    await db.verificationCode.create({
-      data: {
-        email: email,
-        code
-      }
+    const existRequest = await db.verificationCode.findFirst({
+      where: { email }
     })
+
+    if (existRequest) {
+      await db.verificationCode.update({
+        where: { id: existRequest.id },
+        data: {
+          code,
+        }
+      })
+    }else {
+      await db.verificationCode.create({
+        data: {
+          email: email,
+          code
+        }
+      })
+    }
 
     await sendVerifyEmail(email, code)
 
