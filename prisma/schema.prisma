@@ -35,6 +35,7 @@ model Scanner {
   birthdate         String
   scans     ScanEvent[]
   createdAt DateTime  @default(now())
+  verifyAt  DateTime?
 
 }
 
@@ -58,4 +59,11 @@ model ScanEvent {
   latitude    Float?
   longitude   Float?
   scannedAt   DateTime  @default(now())
+}
+
+model VerificationCode {
+  id          String    @id @default(cuid())
+  email       String  
+  code        String
+  requestAt   DateTime?    @updatedAt
 }
