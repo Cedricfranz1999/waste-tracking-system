@@ -1,62 +1,47 @@
-import crypto from "crypto";
+const START_MARKER =
+  "$:$2a$12$3KIB5e6BGLf2IZEoWYxtPeTDUN6rgQrHj3gV9qSINNgJdaXXLDaai";
+const END_MARKER =
+  "$$:$2a$12$ORLOi9cxLH/qPAT4FE2MLuBjIz7Nb7H1hTd1QcynsjIyP5j7Z1KHi";
 
-// Helper: generate a random marker
-const generateMarker = (): string => {
-  return `$2a$${crypto.randomBytes(8).toString("hex")}$`;
-};
-
-// Structure for encoded field
 type EncodedData = {
   $: string;
   value: string;
   $$: string;
 };
 
-// Encode string with unique start/end markers
 const encodeToBase64WithMarkers = (str: string): EncodedData => {
-  const marker = generateMarker();
   const base64 = Buffer.from(str, "utf8").toString("base64");
   return {
-    $: marker,
+    $: START_MARKER,
     value: base64,
-    $$: marker,
+    $$: END_MARKER,
   };
 };
 
 const decodeFromBase64WithMarkers = (encoded: EncodedData): string => {
-  if (encoded.$ !== encoded.$$) {
-    throw new Error(
-      "Marker validation failed: start and end markers do not match",
-    );
+  if (encoded.$ !== START_MARKER || encoded.$$ !== END_MARKER) {
+    throw new Error("Marker validation failed: markers do not match");
   }
-
   return Buffer.from(encoded.value, "base64").toString("utf8");
 };
 
 const safeDecode = (field: string | null): string | null => {
   if (!field) return null;
-
   try {
     const parsed: EncodedData = JSON.parse(field);
-
-    // Additional validation: check if the structure is correct
-    if (!parsed.$ || !parsed.value || !parsed.$$) {
+    if (
+      !parsed.$ ||
+      !parsed.value ||
+      !parsed.$$ ||
+      parsed.$ !== START_MARKER ||
+      parsed.$$ !== END_MARKER
+    ) {
       return "Edited Data";
     }
-
-    // This will throw an error if markers don't match
     return decodeFromBase64WithMarkers(parsed);
   } catch (error) {
-    if (error instanceof Error) {
-      return `Edited Data`;
-    }
     return "Edited Data";
   }
 };
 
-export {
-  generateMarker,
-  encodeToBase64WithMarkers,
-  decodeFromBase64WithMarkers,
-  safeDecode
-}
+export { encodeToBase64WithMarkers, decodeFromBase64WithMarkers, safeDecode };

@@ -29,6 +29,7 @@ model Scanner {
   username      String
   password      String
   firstname      String
+  email          String
   lastname       String
   address         String
   gender          String
@@ -45,8 +46,14 @@ model Product {
   barcode   String    @unique
   manufacturer String
   description String?  
+  type         PRODUCT_ORIGIN @default(LOCAL)
   createdAt DateTime  @default(now())
   scans     ScanEvent[]
+}
+
+  enum PRODUCT_ORIGIN {
+  INTERNATIONAL
+  LOCAL
 }
 
 model ScanEvent {
@@ -58,6 +65,7 @@ model ScanEvent {
   location    String?
   latitude    Float?
   longitude   Float?
+  quantity    Int?
   scannedAt   DateTime  @default(now())
 }
 

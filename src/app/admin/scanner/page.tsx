@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -50,6 +49,7 @@ const scannerSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),
   firstname: z.string().min(1, "First name is required"),
   lastname: z.string().min(1, "Last name is required"),
+  email: z.string().email("Invalid email address"),
   address: z.string().min(1, "Address is required"),
   gender: z.string().min(1, "Gender is required"),
   birthdate: z.string().min(1, "Birthdate is required"),
@@ -64,6 +64,7 @@ interface Scanner {
   password: string;
   firstname: string;
   lastname: string;
+  email: string;
   address: string;
   gender: string;
   birthdate: string;
@@ -97,6 +98,7 @@ export default function ScannersPage() {
       password: "",
       firstname: "",
       lastname: "",
+      email: "",
       address: "",
       gender: "",
       birthdate: "",
@@ -111,6 +113,7 @@ export default function ScannersPage() {
         password: editingScanner.password,
         firstname: editingScanner.firstname,
         lastname: editingScanner.lastname,
+        email: editingScanner.email,
         address: editingScanner.address,
         gender: editingScanner.gender,
         birthdate: editingScanner.birthdate,
@@ -123,6 +126,7 @@ export default function ScannersPage() {
         password: "",
         firstname: "",
         lastname: "",
+        email: "",
         address: "",
         gender: "",
         birthdate: "",
@@ -136,8 +140,6 @@ export default function ScannersPage() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
@@ -161,18 +163,17 @@ export default function ScannersPage() {
       scanner.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       scanner.firstname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       scanner.lastname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      scanner.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       scanner.address?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   const onSubmit = async (data: ScannerFormData) => {
     setIsSubmitting(true);
     try {
-      // Upload image to Supabase if a new file is selected
       let imageUrl = data.image;
       if (selectedFile) {
         imageUrl = await uploadImage(selectedFile);
       }
-
       if (editingScanner) {
         await updateMutation.mutateAsync({
           id: editingScanner.id,
@@ -185,7 +186,6 @@ export default function ScannersPage() {
           image: imageUrl,
         });
       }
-
       await refetch();
       setIsDialogOpen(false);
       setEditingScanner(null);
@@ -246,15 +246,12 @@ export default function ScannersPage() {
                       : "Fill in the details to add a new scanner."}
                   </DialogDescription>
                 </DialogHeader>
-
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
                   className="space-y-4"
                 >
-                  {/* Image Upload Section */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Profile Image</label>
-
                     {imagePreview ? (
                       <div className="relative">
                         <img
@@ -296,11 +293,8 @@ export default function ScannersPage() {
                         </label>
                       </div>
                     )}
-
-                    {/* Hidden input for form validation */}
                     <Input type="hidden" {...form.register("image")} />
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Username *</label>
@@ -314,7 +308,6 @@ export default function ScannersPage() {
                         </p>
                       )}
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Password *</label>
                       <div className="relative">
@@ -344,7 +337,6 @@ export default function ScannersPage() {
                       )}
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">
@@ -360,7 +352,6 @@ export default function ScannersPage() {
                         </p>
                       )}
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Last Name *</label>
                       <Input
@@ -374,7 +365,18 @@ export default function ScannersPage() {
                       )}
                     </div>
                   </div>
-
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Email *</label>
+                    <Input
+                      {...form.register("email")}
+                      placeholder="Enter email"
+                    />
+                    {form.formState.errors.email && (
+                      <p className="text-sm text-red-500">
+                        {form.formState.errors.email.message}
+                      </p>
+                    )}
+                  </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Address *</label>
                     <Textarea
@@ -388,7 +390,6 @@ export default function ScannersPage() {
                       </p>
                     )}
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Gender *</label>
@@ -407,7 +408,6 @@ export default function ScannersPage() {
                         </p>
                       )}
                     </div>
-
                     <div className="space-y-2">
                       <label className="text-sm font-medium">Birthdate *</label>
                       <Input type="date" {...form.register("birthdate")} />
@@ -418,7 +418,6 @@ export default function ScannersPage() {
                       )}
                     </div>
                   </div>
-
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
@@ -455,7 +454,6 @@ export default function ScannersPage() {
               />
             </div>
           </div>
-
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -464,6 +462,7 @@ export default function ScannersPage() {
                   <TableHead>Username</TableHead>
                   <TableHead>First Name</TableHead>
                   <TableHead>Last Name</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Address</TableHead>
                   <TableHead>Gender</TableHead>
                   <TableHead>Birthdate</TableHead>
@@ -482,8 +481,6 @@ export default function ScannersPage() {
                         />
                       )}
                     </TableCell>
-
-                    {/* Username */}
                     <TableCell className="font-medium">
                       {scanner.username === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -493,8 +490,6 @@ export default function ScannersPage() {
                         scanner.username
                       )}
                     </TableCell>
-
-                    {/* First Name */}
                     <TableCell>
                       {scanner.firstname === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -504,8 +499,6 @@ export default function ScannersPage() {
                         scanner.firstname
                       )}
                     </TableCell>
-
-                    {/* Last Name */}
                     <TableCell>
                       {scanner.lastname === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -515,8 +508,15 @@ export default function ScannersPage() {
                         scanner.lastname
                       )}
                     </TableCell>
-
-                    {/* Address */}
+                    <TableCell>
+                      {scanner.email === "Edited Data" ? (
+                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
+                          {scanner.email}
+                        </p>
+                      ) : (
+                        scanner.email
+                      )}
+                    </TableCell>
                     <TableCell>
                       {scanner.address === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -526,8 +526,6 @@ export default function ScannersPage() {
                         scanner.address
                       )}
                     </TableCell>
-
-                    {/* Gender */}
                     <TableCell>
                       {scanner.gender === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -537,8 +535,6 @@ export default function ScannersPage() {
                         scanner.gender
                       )}
                     </TableCell>
-
-                    {/* Birthdate */}
                     <TableCell>
                       {scanner.birthdate === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -548,13 +544,9 @@ export default function ScannersPage() {
                         scanner.birthdate
                       )}
                     </TableCell>
-
-                    {/* CreatedAt */}
                     <TableCell>
                       {scanner.createdAt.toLocaleDateString()}
                     </TableCell>
-
-                    {/* Actions */}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -583,7 +575,6 @@ export default function ScannersPage() {
               </TableBody>
             </Table>
           </div>
-
           {filteredScanners.length === 0 && (
             <div className="py-12 text-center text-gray-500">
               {scanners.length === 0
