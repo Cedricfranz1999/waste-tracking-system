@@ -82,9 +82,9 @@ export const scannerRouter = createTRPCRouter({
     }),
   getAll: publicProcedure.query(async ({ ctx }) => {
     const scanners = await ctx.db.scanner.findMany({
-      where: {
-        email: JSON.stringify(encodeToBase64WithMarkers("johndoe@gmail.com")),
-      },
+      // where: {
+      //   email: JSON.stringify(encodeToBase64WithMarkers("johndoe@gmail.com")),
+      // },
     });
     return scanners.map((scanner) => ({
       ...scanner,
