@@ -3,6 +3,9 @@ import { authRouter } from "./routers/auth";
 import { cmsRouter } from "./routers/cms";
 import { productRouter } from "./routers/product";
 import { scannerRouter } from "./scanner";
+import { dashboardRouter } from "./dashboard";
+import { scanEventRouter } from "./scannerEvent";
+import { reportsRouter } from "./reports";
 
 /**
  * This is the primary router for your server.
@@ -14,6 +17,9 @@ export const appRouter = createTRPCRouter({
   cms: cmsRouter,
   product: productRouter,
   scanner: scannerRouter,
+  dashboard: dashboardRouter,
+  scanEvent: scanEventRouter,
+  reports: reportsRouter,
 });
 
 // export type definition of API

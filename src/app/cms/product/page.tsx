@@ -8,6 +8,13 @@ import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Textarea } from "~/components/ui/textarea";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -36,9 +43,11 @@ import { uploadImage } from "~/lib/upload";
 
 const productSchema = z.object({
   image: z.string().optional(),
+  name: z.string().optional(),
   barcode: z.string().min(1, "Barcode is required"),
   manufacturer: z.string().min(1, "Manufacturer is required"),
   description: z.string().optional(),
+  type: z.enum(["INTERNATIONAL", "LOCAL"]),
 });
 
 type ProductFormData = z.infer<typeof productSchema>;
@@ -46,9 +55,11 @@ type ProductFormData = z.infer<typeof productSchema>;
 interface Product {
   id: string;
   image?: string;
+  name?: string;
   barcode: string;
   manufacturer: string;
   description?: string;
+  type: "INTERNATIONAL" | "LOCAL";
   createdAt: Date;
 }
 
@@ -74,9 +85,11 @@ export default function ProductsPage() {
     resolver: zodResolver(productSchema),
     defaultValues: {
       image: "",
+      name: "",
       barcode: "",
       manufacturer: "",
       description: "",
+      type: "LOCAL",
     },
   });
 
@@ -84,17 +97,21 @@ export default function ProductsPage() {
     if (editingProduct) {
       form.reset({
         image: editingProduct.image || "",
+        name: editingProduct.name || "",
         barcode: editingProduct.barcode,
         manufacturer: editingProduct.manufacturer,
         description: editingProduct.description || "",
+        type: editingProduct.type,
       });
       setImagePreview(editingProduct.image || "");
     } else {
       form.reset({
         image: "",
+        name: "",
         barcode: "",
         manufacturer: "",
         description: "",
+        type: "LOCAL",
       });
       setImagePreview("");
       setSelectedFile(null);
@@ -127,6 +144,7 @@ export default function ProductsPage() {
 
   const filteredProducts = products.filter(
     (product) =>
+      product.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.barcode?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.manufacturer?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description?.toLowerCase().includes(searchTerm.toLowerCase()),
@@ -270,6 +288,19 @@ export default function ProductsPage() {
                   </div>
 
                   <div className="space-y-2">
+                    <label className="text-sm font-medium">Name</label>
+                    <Input
+                      {...form.register("name")}
+                      placeholder="Enter product name"
+                    />
+                    {form.formState.errors.name && (
+                      <p className="text-sm text-red-500">
+                        {form.formState.errors.name.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
                     <label className="text-sm font-medium">Barcode *</label>
                     <Input
                       {...form.register("barcode")}
@@ -307,6 +338,31 @@ export default function ProductsPage() {
                     {form.formState.errors.description && (
                       <p className="text-sm text-red-500">
                         {form.formState.errors.description.message}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Product Type</label>
+                    <Select
+                      value={form.watch("type")}
+                      onValueChange={(value: "INTERNATIONAL" | "LOCAL") =>
+                        form.setValue("type", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select product type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LOCAL">Local</SelectItem>
+                        <SelectItem value="INTERNATIONAL">
+                          International
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {form.formState.errors.type && (
+                      <p className="text-sm text-red-500">
+                        {form.formState.errors.type.message}
                       </p>
                     )}
                   </div>
@@ -353,9 +409,11 @@ export default function ProductsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Image</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Barcode</TableHead>
                   <TableHead>Manufacturer</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Type</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -368,7 +426,19 @@ export default function ProductsPage() {
                         <img
                           src={product.image}
                           className="h-10 w-10 rounded object-cover"
+                          alt={product.name || "Product"}
                         />
+                      )}
+                    </TableCell>
+
+                    {/* Name */}
+                    <TableCell>
+                      {product.name === "Edited Data" ? (
+                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
+                          {product.name}
+                        </p>
+                      ) : (
+                        product.name
                       )}
                     </TableCell>
 
@@ -405,16 +475,22 @@ export default function ProductsPage() {
                       )}
                     </TableCell>
 
+                    {/* Type */}
+                    <TableCell>
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs font-medium ${
+                          product.type === "INTERNATIONAL"
+                            ? "bg-blue-100 text-blue-800"
+                            : "bg-green-100 text-green-800"
+                        }`}
+                      >
+                        {product.type}
+                      </span>
+                    </TableCell>
+
                     {/* CreatedAt */}
                     <TableCell>
-                      {product.createdAt.toLocaleDateString() ===
-                      "Edited Data" ? (
-                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
-                          {product.createdAt.toLocaleDateString()}
-                        </p>
-                      ) : (
-                        product.createdAt.toLocaleDateString()
-                      )}
+                      {product.createdAt.toLocaleDateString()}
                     </TableCell>
 
                     {/* Actions */}

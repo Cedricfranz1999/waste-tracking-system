@@ -43,10 +43,11 @@ model Scanner {
 model Product {
   id        String    @id @default(cuid())
   image     String? 
+  name       String?
   barcode   String    @unique
   manufacturer String
   description String?  
-  type         PRODUCT_ORIGIN @default(LOCAL)
+  type         PRODUCT_ORIGIN? @default(LOCAL)
   createdAt DateTime  @default(now())
   scans     ScanEvent[]
 }
@@ -63,10 +64,10 @@ model ScanEvent {
   product     Product?  @relation(fields: [productId], references: [id])
   productId   String?
   location    String?
-  latitude    Float?
-  longitude   Float?
+  latitude    String
+  longitude   String
   quantity    Int?
-  scannedAt   DateTime  @default(now())
+  scannedAt   DateTime?  @default(now())
 }
 
 model VerificationCode {

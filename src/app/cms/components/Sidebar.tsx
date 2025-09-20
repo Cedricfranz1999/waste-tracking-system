@@ -59,21 +59,7 @@ const Sidebar = () => {
         <div className="mt-6 flex-1">
           <nav className="grid items-start px-2 text-sm font-medium lg:px-4">
             {/* Dashboard */}
-            <motion.div whileHover={{ scale: 1.02 }}>
-              <div className="flex items-center justify-between">
-                <Link
-                  href="/cms/dashboard"
-                  className={`flex flex-1 items-center gap-3 rounded-lg px-3 py-2 transition-all ${
-                    isActive("/cms/dashboard")
-                      ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white shadow-lg"
-                      : "text-white hover:bg-teal-600/80 hover:text-white"
-                  }`}
-                >
-                  <Barcode className="h-4 w-4" />
-                  Dashboard
-                </Link>
-              </div>
-            </motion.div>
+
             <motion.div whileHover={{ scale: 1.02 }}>
               <div className="flex items-center justify-between">
                 <Link

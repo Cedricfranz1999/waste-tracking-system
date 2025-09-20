@@ -1,4 +1,3 @@
-// In your productRouter file
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
@@ -58,38 +57,25 @@ const safeDecode = (field: string | null): string | null => {
   }
 };
 
-// Additional validation function if you want to check data before storing
-const validateEncodedData = (field: string | null): boolean => {
-  if (!field) return true;
-
-  try {
-    const parsed: EncodedData = JSON.parse(field);
-
-    if (!parsed.$ || !parsed.value || !parsed.$$) {
-      return false;
-    }
-
-    // Check if markers match
-    return parsed.$ === parsed.$$;
-  } catch {
-    return false;
-  }
-};
-
 export const productRouter = createTRPCRouter({
   create: publicProcedure
     .input(
       z.object({
         image: z.string().optional(),
+        name: z.string().optional(),
         barcode: z.string(),
         manufacturer: z.string(),
         description: z.string().optional(),
+        type: z.enum(["INTERNATIONAL", "LOCAL"]).default("LOCAL"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const encodedData = {
         image: input.image
           ? JSON.stringify(encodeToBase64WithMarkers(input.image))
+          : null,
+        name: input.name
+          ? JSON.stringify(encodeToBase64WithMarkers(input.name))
           : null,
         barcode: JSON.stringify(encodeToBase64WithMarkers(input.barcode)),
         manufacturer: JSON.stringify(
@@ -98,6 +84,7 @@ export const productRouter = createTRPCRouter({
         description: input.description
           ? JSON.stringify(encodeToBase64WithMarkers(input.description))
           : null,
+        type: input.type,
       };
 
       return ctx.db.product.create({ data: encodedData });
@@ -111,6 +98,7 @@ export const productRouter = createTRPCRouter({
     return products.map((product) => ({
       ...product,
       image: safeDecode(product.image),
+      name: safeDecode(product.name),
       barcode: safeDecode(product.barcode),
       manufacturer: safeDecode(product.manufacturer),
       description: safeDecode(product.description),
@@ -135,6 +123,7 @@ export const productRouter = createTRPCRouter({
       const decodedProduct = {
         ...product,
         image: safeDecode(product.image),
+        name: safeDecode(product.name),
         barcode: safeDecode(product.barcode),
         manufacturer: safeDecode(product.manufacturer),
         description: safeDecode(product.description),
@@ -143,6 +132,7 @@ export const productRouter = createTRPCRouter({
       // Check if any field has validation errors
       const validationErrors = [
         decodedProduct.image,
+        decodedProduct.name,
         decodedProduct.barcode,
         decodedProduct.manufacturer,
         decodedProduct.description,
@@ -163,9 +153,11 @@ export const productRouter = createTRPCRouter({
       z.object({
         id: z.string(),
         image: z.string().optional(),
+        name: z.string().optional(),
         barcode: z.string(),
         manufacturer: z.string(),
         description: z.string().optional(),
+        type: z.enum(["INTERNATIONAL", "LOCAL"]).default("LOCAL"),
       }),
     )
     .mutation(async ({ ctx, input }) => {
@@ -175,6 +167,9 @@ export const productRouter = createTRPCRouter({
         image: data.image
           ? JSON.stringify(encodeToBase64WithMarkers(data.image))
           : null,
+        name: data.name
+          ? JSON.stringify(encodeToBase64WithMarkers(data.name))
+          : null,
         barcode: JSON.stringify(encodeToBase64WithMarkers(data.barcode)),
         manufacturer: JSON.stringify(
           encodeToBase64WithMarkers(data.manufacturer),
@@ -182,6 +177,7 @@ export const productRouter = createTRPCRouter({
         description: data.description
           ? JSON.stringify(encodeToBase64WithMarkers(data.description))
           : null,
+        type: data.type,
       };
 
       return ctx.db.product.update({ where: { id }, data: encodedData });

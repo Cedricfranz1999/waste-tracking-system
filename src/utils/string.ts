@@ -25,7 +25,7 @@ const decodeFromBase64WithMarkers = (encoded: EncodedData): string => {
   return Buffer.from(encoded.value, "base64").toString("utf8");
 };
 
-const safeDecode = (field: string | null): string | null => {
+const safeDecode = (field: string | null): string | any => {
   if (!field) return null;
   try {
     const parsed: EncodedData = JSON.parse(field);

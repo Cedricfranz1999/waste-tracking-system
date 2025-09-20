@@ -21,7 +21,7 @@ const AdminLayout = ({ children }: { children: React.ReactNode }) => {
     if (!mounted) return;
 
     if (role === "ADMIN") {
-      router.push("/admin/scanner");
+      router.push("/admin/dashboard");
     } else {
       router.push("/cms-login");
     }
