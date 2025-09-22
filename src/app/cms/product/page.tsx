@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -40,6 +39,7 @@ import {
 import { Plus, Edit, Trash2, Search, Loader2, Upload, X } from "lucide-react";
 import { api } from "~/trpc/react";
 import { uploadImage } from "~/lib/upload";
+import Barcode from "react-barcode";
 
 const productSchema = z.object({
   image: z.string().optional(),
@@ -77,6 +77,7 @@ export default function ProductsPage() {
     refetch,
     isLoading,
   } = api.product.getAll.useQuery();
+
   const createMutation = api.product.create.useMutation();
   const updateMutation = api.product.update.useMutation();
   const deleteMutation = api.product.delete.useMutation();
@@ -122,8 +123,6 @@ export default function ProductsPage() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
-
-      // Create preview
       const reader = new FileReader();
       reader.onload = (e) => {
         const dataUrl = e.target?.result as string;
@@ -153,12 +152,10 @@ export default function ProductsPage() {
   const onSubmit = async (data: ProductFormData) => {
     setIsSubmitting(true);
     try {
-      // Upload image to Supabase if a new file is selected
       let imageUrl = data.image;
       if (selectedFile) {
         imageUrl = await uploadImage(selectedFile);
       }
-
       if (editingProduct) {
         await updateMutation.mutateAsync({
           id: editingProduct.id,
@@ -171,7 +168,6 @@ export default function ProductsPage() {
           image: imageUrl,
         });
       }
-
       await refetch();
       setIsDialogOpen(false);
       setEditingProduct(null);
@@ -232,7 +228,6 @@ export default function ProductsPage() {
                       : "Fill in the details to add a new product."}
                   </DialogDescription>
                 </DialogHeader>
-
                 <form
                   onSubmit={form.handleSubmit(onSubmit)}
                   className="space-y-4"
@@ -240,7 +235,6 @@ export default function ProductsPage() {
                   {/* Image Upload Section */}
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Product Image</label>
-
                     {imagePreview ? (
                       <div className="relative">
                         <img
@@ -282,11 +276,8 @@ export default function ProductsPage() {
                         </label>
                       </div>
                     )}
-
-                    {/* Hidden input for form validation */}
                     <Input type="hidden" {...form.register("image")} />
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Name</label>
                     <Input
@@ -299,7 +290,6 @@ export default function ProductsPage() {
                       </p>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Barcode *</label>
                     <Input
@@ -312,7 +302,6 @@ export default function ProductsPage() {
                       </p>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium">
                       Manufacturer *
@@ -327,7 +316,6 @@ export default function ProductsPage() {
                       </p>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Description</label>
                     <Textarea
@@ -341,7 +329,6 @@ export default function ProductsPage() {
                       </p>
                     )}
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Product Type</label>
                     <Select
@@ -366,7 +353,6 @@ export default function ProductsPage() {
                       </p>
                     )}
                   </div>
-
                   <div className="flex justify-end gap-2">
                     <Button
                       type="button"
@@ -403,7 +389,6 @@ export default function ProductsPage() {
               />
             </div>
           </div>
-
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -430,8 +415,6 @@ export default function ProductsPage() {
                         />
                       )}
                     </TableCell>
-
-                    {/* Name */}
                     <TableCell>
                       {product.name === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -441,19 +424,12 @@ export default function ProductsPage() {
                         product.name
                       )}
                     </TableCell>
-
-                    {/* Barcode */}
                     <TableCell className="font-medium">
-                      {product.barcode === "Edited Data" ? (
-                        <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
-                          {product.barcode}
-                        </p>
-                      ) : (
-                        product.barcode
-                      )}
+                      <div className="flex flex-col items-center">
+                        <Barcode value={product.barcode as any} />
+                        <span className="mt-1 text-xs">{product.barcode}</span>
+                      </div>
                     </TableCell>
-
-                    {/* Manufacturer */}
                     <TableCell>
                       {product.manufacturer === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -463,8 +439,6 @@ export default function ProductsPage() {
                         product.manufacturer
                       )}
                     </TableCell>
-
-                    {/* Description */}
                     <TableCell>
                       {product.description === "Edited Data" ? (
                         <p className="shadow-2x w-32 truncate rounded-2xl border border-red-300 bg-white px-2 py-1 text-center text-red-500 drop-shadow-2xl">
@@ -474,8 +448,6 @@ export default function ProductsPage() {
                         product.description
                       )}
                     </TableCell>
-
-                    {/* Type */}
                     <TableCell>
                       <span
                         className={`rounded-full px-2 py-1 text-xs font-medium ${
@@ -487,13 +459,9 @@ export default function ProductsPage() {
                         {product.type}
                       </span>
                     </TableCell>
-
-                    {/* CreatedAt */}
                     <TableCell>
                       {product.createdAt.toLocaleDateString()}
                     </TableCell>
-
-                    {/* Actions */}
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
@@ -522,7 +490,6 @@ export default function ProductsPage() {
               </TableBody>
             </Table>
           </div>
-
           {filteredProducts.length === 0 && (
             <div className="py-12 text-center text-gray-500">
               {products.length === 0
