@@ -32,6 +32,8 @@ model Scanner {
   email          String
   lastname       String
   address         String
+  barangay        String?
+  purok           String?
   gender          String
   birthdate         String
   scans     ScanEvent[]
