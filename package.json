@@ -72,6 +72,7 @@
     "next-themes": "^0.4.6",
     "nodemailer": "^7.0.6",
     "react": "^19.0.0",
+    "react-barcode": "^1.6.1",
     "react-day-picker": "^9.10.0",
     "react-dom": "^19.0.0",
     "react-hook-form": "^7.62.0",
