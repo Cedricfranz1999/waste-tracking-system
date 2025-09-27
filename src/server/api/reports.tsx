@@ -2,6 +2,53 @@ import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "./trpc";
 import { db } from "../db";
 import { safeDecode } from "~/utils/string";
+import type { EncodedData } from "~/utils/not_hard_coded";
+
+const START_MARKER =
+  "$:$2a$12$3KIB5e6BGLf2IZEoWYxtPeTDUN6rgQrHj3gV9qSINNgJdaXXLDaai";
+const END_MARKER =
+  "$$:$2a$12$ORLOi9cxLH/qPAT4FE2MLuBjIz7Nb7H1hTd1QcynsjIyP5j7Z1KHi";
+
+type _EncodedData = {
+  $: string;
+  value: string;
+  $$: string;
+};
+
+const _encodeToBase64WithMarkers = (str: string): EncodedData => {
+  const base64 = Buffer.from(str, "utf8").toString("base64");
+  return {
+    $: START_MARKER,
+    value: base64,
+    $$: END_MARKER,
+  };
+};
+
+const _decodeFromBase64WithMarkers = (encoded: EncodedData): string => {
+  if (encoded.$ !== START_MARKER || encoded.$$ !== END_MARKER) {
+    throw new Error("Marker validation failed: markers do not match");
+  }
+  return Buffer.from(encoded.value, "base64").toString("utf8");
+};
+
+const _safeDecode = (field: string | null): string | null => {
+  if (!field) return null;
+  try {
+    const parsed: EncodedData = JSON.parse(field);
+    if (
+      !parsed.$ ||
+      !parsed.value ||
+      !parsed.$$ ||
+      parsed.$ !== START_MARKER ||
+      parsed.$$ !== END_MARKER
+    ) {
+      return "Edited Data";
+    }
+    return _decodeFromBase64WithMarkers(parsed);
+  } catch (error) {
+    return "Edited Data";
+  }
+};
 
 export const reportsRouter = createTRPCRouter({
   getReports: publicProcedure
@@ -188,7 +235,8 @@ export const reportsRouter = createTRPCRouter({
         const product = productTypeDetails.find((p) => p.id === stat.productId);
         if (product && product.type) {
           const type = safeDecode(product.type);
-          typeCountMap[type] = (typeCountMap[type] || 0) + stat._count.id;
+          typeCountMap[type as any] =
+            (typeCountMap[type as any] || 0) + stat._count.id;
         }
       });
 
@@ -205,23 +253,23 @@ export const reportsRouter = createTRPCRouter({
           ...event,
           scanner: {
             ...event.scanner,
-            firstname: safeDecode(event.scanner.firstname),
-            lastname: safeDecode(event.scanner.lastname),
-            email: safeDecode(event.scanner.email),
+            firstname: _safeDecode(event.scanner.firstname),
+            lastname: _safeDecode(event.scanner.lastname),
+            email: _safeDecode(event.scanner.email),
           },
           product: event.product
             ? {
                 ...event.product,
                 name: safeDecode(event.product.name),
-                type: safeDecode(event.product.type),
+                type: event.product.type,
                 image: safeDecode(event.product.image),
                 manufacturer: safeDecode(event.product.manufacturer),
                 barcode: safeDecode(event.product.barcode),
               }
             : null,
-          location: event.location ? safeDecode(event.location) : null,
-          latitude: safeDecode(event.latitude),
-          longitude: safeDecode(event.longitude),
+          location: event.location ? event.location : null,
+          latitude: event.latitude,
+          longitude: event.longitude,
         };
       });
 

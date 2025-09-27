@@ -18,6 +18,8 @@ export default tseslint.config(
       ...tseslint.configs.stylisticTypeChecked,
     ],
     rules: {
+      "@typescript-eslint/prefer-optional-chain": "off",
+      "@typescript-eslint/no-inferrable-types": "off",
       "@typescript-eslint/array-type": "off",
       "@typescript-eslint/consistent-type-definitions": "off",
       "@typescript-eslint/no-unsafe-return": "off",

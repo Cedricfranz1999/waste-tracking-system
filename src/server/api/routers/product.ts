@@ -91,7 +91,7 @@ export const productRouter = createTRPCRouter({
     }),
 
   getAll: publicProcedure.query(async ({ ctx }) => {
-    const base64 = Buffer.from("0 14285", "utf8").toString("base64");
+    // const base64 = Buffer.from("0 14285", "utf8").toString("base64");
 
     const products = await ctx.db.product.findMany({
       orderBy: { createdAt: "desc" },
