@@ -18,16 +18,19 @@ export async function POST(req: NextRequest) {
     }
 
     const { code, password, ...payloadRest } = payload
-    await db.scanner.create({
+    const scanner = await db.scanner.create({
       data: {
         verifyAt: new Date().toISOString(),
+        email: JSON.stringify(encodeToBase64WithMarkers(payload.email)),
         username: JSON.stringify(encodeToBase64WithMarkers(payload.email)),
         password: JSON.stringify(encodeToBase64WithMarkers(payload.password)),
         firstname: JSON.stringify(encodeToBase64WithMarkers(payload.firstname)),
         lastname: JSON.stringify(encodeToBase64WithMarkers(payload.lastname)),
-        address: JSON.stringify(encodeToBase64WithMarkers(payload.address)),
+        address: JSON.stringify(encodeToBase64WithMarkers(`P${payload?.purok}. Barangay ${payload?.barangay}, Calbayog City`)),
+        barangay: JSON.stringify(encodeToBase64WithMarkers(payload?.barangay)),
+        purok: JSON.stringify(encodeToBase64WithMarkers(payload?.purok)),
         gender: JSON.stringify(encodeToBase64WithMarkers(payload.gender)),
-        birthdate: JSON.stringify(encodeToBase64WithMarkers(payload.birthdate)),
+        birthdate: payload?.birthdate,
       }
     })
 
@@ -36,14 +39,14 @@ export async function POST(req: NextRequest) {
     })
 
     const secret = process.env.JWT_SECRET || 'secret'
-    const token = jwt.sign(payloadRest, secret, {
+    const token = jwt.sign({ ...payloadRest, id: scanner.id }, secret, {
       expiresIn: '7d'
     })
 
     return NextResponse.json({
       ok: true,
       token: token,
-      user: payloadRest,
+      user: { ...payloadRest, id: scanner.id },
     })
   } catch (error) {
     console.log(error)

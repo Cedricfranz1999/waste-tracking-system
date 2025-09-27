@@ -18,30 +18,79 @@ const encodeToBase64WithMarkers = (str: string): EncodedData => {
   };
 };
 
-const decodeFromBase64WithMarkers = (encoded: EncodedData): string => {
+const decodeMethod1 = (encoded: EncodedData): string => {
   if (encoded.$ !== START_MARKER || encoded.$$ !== END_MARKER) {
     throw new Error("Marker validation failed: markers do not match");
   }
   return Buffer.from(encoded.value, "base64").toString("utf8");
 };
 
-const safeDecode = (field: string | null): string | any => {
+// const safeDecode = (field: string | null, method?: any): string | any => {
+//   if (!field) return null;
+//   try {
+//     const parsed: EncodedData = JSON.parse(field);
+//     if (
+//       !parsed.$ ||
+//       !parsed.value ||
+//       !parsed.$$ ||
+//       parsed.$ !== START_MARKER ||
+//       parsed.$$ !== END_MARKER
+//     ) {
+//       return "Edited Data";
+//     }
+//     return decodeMethod1(parsed);
+//   } catch (error) {
+//     return "Edited Data";
+//   }
+// };
+
+const decodeMethod2 = (encoded: EncodedData, method: number = 1): string => {
+  if (encoded.$ !== encoded.$$) {
+    throw new Error(
+      "Marker validation failed: start and end markers do not match",
+    );
+  }
+
+  return Buffer.from(encoded.value, "base64").toString("utf8");
+};
+
+const safeDecode = (field: string | null, method: number = 2): string | null => {
   if (!field) return null;
-  try {
-    const parsed: EncodedData = JSON.parse(field);
-    if (
-      !parsed.$ ||
-      !parsed.value ||
-      !parsed.$$ ||
-      parsed.$ !== START_MARKER ||
-      parsed.$$ !== END_MARKER
-    ) {
+
+  if (method == 2) {
+    try {
+      const parsed: EncodedData = JSON.parse(field);
+  
+      // Additional validation: check if the structure is correct
+      if (!parsed.$ || !parsed.value || !parsed.$$) {
+        return "Edited Data";
+      }
+  
+      // This will throw an error if markers don't match
+      return decodeMethod2(parsed);
+    } catch (error) {
+      if (error instanceof Error) {
+        return `Edited Data`;
+      }
       return "Edited Data";
     }
-    return decodeFromBase64WithMarkers(parsed);
-  } catch (error) {
-    return "Edited Data";
+  }else {
+    try {
+      const parsed: EncodedData = JSON.parse(field);
+      if (
+        !parsed.$ ||
+        !parsed.value ||
+        !parsed.$$ ||
+        parsed.$ !== START_MARKER ||
+        parsed.$$ !== END_MARKER
+      ) {
+        return "Edited Data";
+      }
+      return decodeMethod1(parsed);
+    } catch (error) {
+      return "Edited Data";
+    }
   }
 };
 
-export { encodeToBase64WithMarkers, decodeFromBase64WithMarkers, safeDecode };
+export { encodeToBase64WithMarkers, safeDecode };
