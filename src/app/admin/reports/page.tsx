@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { CalendarIcon, Download } from "lucide-react";
@@ -38,6 +38,7 @@ import {
 } from "recharts";
 import { api } from "~/trpc/react";
 import { safeDecode } from "~/utils/string";
+import { reverseGeocode } from "~/utils/geolocation";
 
 // Define types for our data
 interface Scanner {
@@ -86,7 +87,7 @@ const COLORS = [
 
 export default function ReportsPage() {
   const [date, setDate] = useState<DateRange | undefined>({
-    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Default to last 7 days
+    from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
     to: new Date(),
   });
 
@@ -100,16 +101,36 @@ export default function ReportsPage() {
       endDate: date?.to?.toISOString(),
     },
     {
-      enabled: !!date?.from && !!date?.to, // Only run query when dates are available
+      enabled: !!date?.from && !!date?.to,
     },
   );
+
+  const [scanEventsWithLocation, setScanEventsWithLocation] = useState<ScanEvent[]>([]);
+
+  useEffect(() => {
+    if (reportData?.scanEvents) {
+      const fetchLocations = async () => {
+        const eventsWithLocation = await Promise.all(
+          reportData.scanEvents.map(async (event) => {
+            if (event.latitude && event.longitude) {
+              const location = await reverseGeocode(event.latitude, event.longitude);
+              return { ...event, location };
+            }
+            return event;
+          }),
+        );
+        setScanEventsWithLocation(eventsWithLocation as any);
+      };
+      fetchLocations();
+    }
+  }, [reportData]);
 
   const handleDateSelect = (selectedDate: DateRange | undefined) => {
     setDate(selectedDate);
   };
 
   const handleExportCSV = () => {
-    if (!reportData?.scanEvents) return;
+    if (!scanEventsWithLocation.length) return;
 
     const headers = [
       "Product Name",
@@ -125,7 +146,7 @@ export default function ReportsPage() {
       "Scanned At",
     ];
 
-    const csvData = reportData.scanEvents.map((event) => [
+    const csvData = scanEventsWithLocation.map((event) => [
       event.product?.name || "N/A",
       event.product?.manufacturer || "N/A",
       event.product?.barcode || "N/A",
@@ -162,6 +183,61 @@ export default function ReportsPage() {
     document.body.removeChild(link);
   };
 
+  // Aggregate scan events by product and sum quantities
+  const aggregatedProductStats = scanEventsWithLocation.reduce((acc, event) => {
+    if (!event.product) return acc;
+
+    const productName = event.product.name || "Unknown";
+    const existingProduct = acc.find((item) => item.productName === productName);
+
+    if (existingProduct) {
+      existingProduct.count += event.quantity || 0;
+    } else {
+      acc.push({
+        productName: productName,
+        count: event.quantity || 0,
+      });
+    }
+
+    return acc;
+  }, [] as { productName: string; count: number }[]);
+
+  // Aggregate scan events by product type and sum quantities
+  const aggregatedTypeStats = scanEventsWithLocation.reduce((acc, event) => {
+    if (!event.product) return acc;
+
+    const productType = event.product.type || "Unknown";
+    const existingType = acc.find((item) => item.type === productType);
+
+    if (existingType) {
+      existingType.count += event.quantity || 0;
+    } else {
+      acc.push({
+        type: productType,
+        count: event.quantity || 0,
+      });
+    }
+
+    return acc;
+  }, [] as { type: string; count: number }[]);
+
+  // Aggregate scan events by location and sum quantities
+  const aggregatedLocationStats = scanEventsWithLocation.reduce((acc, event) => {
+    const location = event.location || "Unknown";
+    const existingLocation = acc.find((item) => item.location === location);
+
+    if (existingLocation) {
+      existingLocation.count += event.quantity || 0;
+    } else {
+      acc.push({
+        location: location,
+        count: event.quantity || 0,
+      });
+    }
+
+    return acc;
+  }, [] as { location: string; count: number }[]);
+
   return (
     <div className="container mx-auto space-y-6 py-6">
       <div className="flex items-center justify-between">
@@ -170,7 +246,7 @@ export default function ReportsPage() {
         <div className="flex items-center space-x-2">
           <Button
             onClick={handleExportCSV}
-            disabled={!reportData?.scanEvents?.length}
+            disabled={!scanEventsWithLocation.length}
           >
             <Download className="mr-2 h-4 w-4" />
             Export CSV
@@ -262,11 +338,11 @@ export default function ReportsPage() {
               <CardTitle>Scans by Product Type</CardTitle>
             </CardHeader>
             <CardContent>
-              {reportData.typeStats?.length > 0 ? (
+              {aggregatedTypeStats?.length > 0 ? (
                 <ResponsiveContainer width="100%" height={300}>
                   <PieChart>
                     <Pie
-                      data={reportData.typeStats}
+                      data={aggregatedTypeStats}
                       cx="50%"
                       cy="50%"
                       labelLine={false}
@@ -275,7 +351,7 @@ export default function ReportsPage() {
                       dataKey="count"
                       nameKey="type"
                       label={({ name, count }: any) => {
-                        const total = reportData.typeStats.reduce(
+                        const total = aggregatedTypeStats.reduce(
                           (sum: number, item: any) => sum + item.count,
                           0,
                         );
@@ -283,7 +359,7 @@ export default function ReportsPage() {
                         return `${name}: ${percentage}%`;
                       }}
                     >
-                      {reportData.typeStats.map((entry: any, index: number) => (
+                      {aggregatedTypeStats.map((entry: any, index: number) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={COLORS[index % COLORS.length]}
@@ -309,43 +385,56 @@ export default function ReportsPage() {
               <CardTitle>Top Scanned Products</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart
-                  data={(reportData.productStats || []).slice(0, 5)}
-                  layout="vertical"
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis type="number" />
-                  <YAxis
-                    type="category"
-                    dataKey="productName"
-                    width={100}
-                    tick={{ fontSize: 12 }}
-                  />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="count" fill="#00C49F" />
-                </BarChart>
-              </ResponsiveContainer>
+              {aggregatedProductStats?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart
+                    data={aggregatedProductStats}
+                    layout="vertical"
+                    margin={{ left: 20 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis type="number" />
+                    <YAxis
+                      type="category"
+                      dataKey="productName"
+                      width={150}
+                      tick={{ fontSize: 12 }}
+                    />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#00C49F" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-64 items-center justify-center">
+                  <p className="text-muted-foreground">No product data available</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Scans by Location */}
+          {/* Scans by Location (MODIFIED) */}
           <Card>
             <CardHeader>
               <CardTitle>Scans by Location</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={(reportData.locationStats || []).slice(0, 5)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="location" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="count" fill="#FF8042" />
-                </BarChart>
-              </ResponsiveContainer>
+              {aggregatedLocationStats?.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={aggregatedLocationStats}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="location" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="count" fill="#FF8042" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-64 items-center justify-center">
+                  <p className="text-muted-foreground">No location data available</p>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -411,7 +500,7 @@ export default function ReportsPage() {
             </TableBody>
           </Table>
         </div>
-      ) : reportData && reportData.scanEvents.length > 0 ? (
+      ) : scanEventsWithLocation.length > 0 ? (
         <div className="rounded-md border">
           <Table>
             <TableHeader>
@@ -430,7 +519,7 @@ export default function ReportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reportData.scanEvents.map((event) => (
+              {scanEventsWithLocation.map((event) => (
                 <TableRow key={event.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-3">

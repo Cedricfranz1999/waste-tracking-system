@@ -156,10 +156,14 @@ export const reportsRouter = createTRPCRouter({
             in: productStats.map((stat) => stat.productId!).filter(Boolean),
           },
         },
-        select: {
-          id: true,
-          name: true,
-        },
+     include: {
+    scans: {
+      include:{
+        product:true
+      }
+    }
+  },
+     
       });
 
       // Get location statistics
@@ -209,7 +213,7 @@ export const reportsRouter = createTRPCRouter({
         return {
           scannerId: stat.scannerId,
           scannerName: scanner
-            ? `${safeDecode(scanner.firstname)} ${safeDecode(scanner.lastname)}`
+            ? `${_safeDecode(scanner.firstname)} ${_safeDecode(scanner.lastname)}`
             : "Unknown",
           count: stat._count.id,
         };
