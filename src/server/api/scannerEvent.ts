@@ -208,4 +208,75 @@ export const scanEventRouter = createTRPCRouter({
         };
       });
     }),
+    getScanEventsByManufacturer: publicProcedure
+  .input(
+    z.object({
+      startDate: z.string().optional(),
+      endDate: z.string().optional(),
+    }),
+  )
+  .query(async ({ input }) => {
+    const { startDate, endDate } = input;
+    const whereClause: any = {
+      manufacturerId: { not: null },
+      productId: null,
+    };
+    if (startDate && endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      whereClause.scannedAt = {
+        gte: new Date(startDate),
+        lte: endOfDay,
+      };
+    } else if (startDate) {
+      whereClause.scannedAt = {
+        gte: new Date(startDate),
+      };
+    } else if (endDate) {
+      const endOfDay = new Date(endDate);
+      endOfDay.setHours(23, 59, 59, 999);
+      whereClause.scannedAt = {
+        lte: endOfDay,
+      };
+    }
+    const scanEvents = await db.scanEvent.findMany({
+      where: whereClause,
+      include: {
+        manufacturer: {
+          select: {
+            id: true,
+            name: true,
+            barcode: true,
+          },
+        },
+        scanner: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+          },
+        },
+      },
+      orderBy: {
+        scannedAt: "desc",
+      },
+    });
+    return scanEvents.map((event) => ({
+      ...event,
+      scanner: {
+        ...event.scanner,
+        firstname: _safeDecode(event.scanner.firstname),
+        lastname: _safeDecode(event.scanner.lastname),
+      },
+      manufacturer: event.manufacturer
+        ? {
+            ...event.manufacturer,
+            name: safeDecode(event.manufacturer.name),
+            barcode: safeDecode(event.manufacturer.barcode),
+          }
+        : null,
+      latitude: event.latitude,
+      longitude: event.longitude,
+    }));
+  }),
 });

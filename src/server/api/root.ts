@@ -6,6 +6,7 @@ import { scannerRouter } from "./scanner";
 import { dashboardRouter } from "./dashboard";
 import { scanEventRouter } from "./scannerEvent";
 import { reportsRouter } from "./reports";
+import { manufacturerRouter } from "./routers/manufacturer";
 
 /**
  * This is the primary router for your server.
@@ -20,6 +21,7 @@ export const appRouter = createTRPCRouter({
   dashboard: dashboardRouter,
   scanEvent: scanEventRouter,
   reports: reportsRouter,
+  manufacturer: manufacturerRouter
 });
 
 // export type definition of API

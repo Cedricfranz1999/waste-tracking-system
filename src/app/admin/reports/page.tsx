@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { CalendarIcon, Download } from "lucide-react";
@@ -12,14 +11,6 @@ import {
 } from "~/components/ui/popover";
 import { Button } from "~/components/ui/button";
 import { cn } from "~/lib/utils";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "~/components/ui/table";
 import { Badge } from "~/components/ui/badge";
 import { Skeleton } from "~/components/ui/skeleton";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
@@ -39,15 +30,28 @@ import {
 import { api } from "~/trpc/react";
 import { safeDecode } from "~/utils/string";
 import { reverseGeocode } from "~/utils/geolocation";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "~/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
 
-// Define types for our data
 interface Scanner {
   id: string;
   firstname: string;
   lastname: string;
   email: string;
 }
-
 interface Product {
   id: string;
   name: string | null;
@@ -56,7 +60,6 @@ interface Product {
   type: string;
   image: string | null;
 }
-
 interface ScanEvent {
   id: string;
   scanner: Scanner;
@@ -67,7 +70,6 @@ interface ScanEvent {
   quantity: number | null;
   scannedAt: Date;
 }
-
 interface ReportData {
   scanEvents: ScanEvent[];
   scannerStats: { scannerId: string; scannerName: string; count: number }[];
@@ -75,7 +77,6 @@ interface ReportData {
   locationStats: { location: string; count: number }[];
   typeStats: { type: string; count: number }[];
 }
-
 const COLORS = [
   "#0088FE",
   "#00C49F",
@@ -90,6 +91,10 @@ export default function ReportsPage() {
     from: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
     to: new Date(),
   });
+  const [manufacturerFilter, setManufacturerFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [scannerFilter, setScannerFilter] = useState<string>("all");
+  const [locationFilter, setLocationFilter] = useState<string>("all");
 
   const {
     data: reportData,
@@ -105,7 +110,22 @@ export default function ReportsPage() {
     },
   );
 
+  const {
+    data: manufacturerScanEvents,
+    isLoading: isManufacturerLoading,
+    error: manufacturerError,
+  } = api.scanEvent.getScanEventsByManufacturer.useQuery(
+    {
+      startDate: date?.from?.toISOString(),
+      endDate: date?.to?.toISOString(),
+    },
+    {
+      enabled: !!date?.from && !!date?.to,
+    },
+  );
+
   const [scanEventsWithLocation, setScanEventsWithLocation] = useState<ScanEvent[]>([]);
+  const [manufacturerScanEventsWithLocation, setManufacturerScanEventsWithLocation] = useState<any[]>([]);
 
   useEffect(() => {
     if (reportData?.scanEvents) {
@@ -125,182 +145,382 @@ export default function ReportsPage() {
     }
   }, [reportData]);
 
+  useEffect(() => {
+    if (manufacturerScanEvents && manufacturerScanEvents.length > 0) {
+      const initialEvents = manufacturerScanEvents.map((event) => ({
+        ...event,
+        locationLoading: !!event.latitude && !!event.longitude,
+        location: null,
+      }));
+      setManufacturerScanEventsWithLocation(initialEvents);
+      initialEvents.forEach(async (event: any) => {
+        if (event.latitude && event.longitude) {
+          try {
+            const location = await reverseGeocode(event.latitude, event.longitude);
+            setManufacturerScanEventsWithLocation((prev) =>
+              prev.map((e) =>
+                e.id === event.id ? { ...e, location, locationLoading: false } : e
+              )
+            );
+          } catch (err) {
+            setManufacturerScanEventsWithLocation((prev) =>
+              prev.map((e) =>
+                e.id === event.id ? { ...e, locationLoading: false } : e
+              )
+            );
+          }
+        } else {
+          setManufacturerScanEventsWithLocation((prev) =>
+            prev.map((e) =>
+              e.id === event.id ? { ...e, locationLoading: false } : e
+            )
+          );
+        }
+      });
+    }
+  }, [manufacturerScanEvents]);
+
   const handleDateSelect = (selectedDate: DateRange | undefined) => {
     setDate(selectedDate);
   };
 
-  const handleExportCSV = () => {
-    if (!scanEventsWithLocation.length) return;
+  // Filtered data
+  const filteredScanEvents = useMemo(() => {
+    return scanEventsWithLocation.filter((event) => {
+      const matchesManufacturer =
+        manufacturerFilter === "all" ||
+        event.product?.manufacturer?.toLowerCase() === manufacturerFilter.toLowerCase();
+      const matchesType =
+        typeFilter === "all" ||
+        event.product?.type?.toLowerCase() === typeFilter.toLowerCase();
+      const matchesScanner =
+        scannerFilter === "all" ||
+        `${event.scanner.firstname} ${event.scanner.lastname}`.toLowerCase() === scannerFilter.toLowerCase();
+      const matchesLocation =
+        locationFilter === "all" ||
+        event.location?.toLowerCase() === locationFilter.toLowerCase();
+      return matchesManufacturer && matchesType && matchesScanner && matchesLocation;
+    });
+  }, [scanEventsWithLocation, manufacturerFilter, typeFilter, scannerFilter, locationFilter]);
 
-    const headers = [
-      "Product Name",
-      "Manufacturer",
-      "Barcode",
-      "Type",
-      "Scanner",
-      "Scanner Email",
-      "Location",
-      "Latitude",
-      "Longitude",
-      "Quantity",
-      "Scanned At",
-    ];
+  // Filtered manufacturer data
+  const filteredManufacturerScanEvents = useMemo(() => {
+    return manufacturerScanEventsWithLocation.filter((event) => {
+      const matchesManufacturer =
+        manufacturerFilter === "all" ||
+        event.manufacturer?.name?.toLowerCase() === manufacturerFilter.toLowerCase();
+      const matchesType =
+        typeFilter === "all" ||
+        event.product?.type?.toLowerCase() === typeFilter.toLowerCase();
+      const matchesScanner =
+        scannerFilter === "all" ||
+        `${event.scanner.firstname} ${event.scanner.lastname}`.toLowerCase() === scannerFilter.toLowerCase();
+      const matchesLocation =
+        locationFilter === "all" ||
+        event.location?.toLowerCase() === locationFilter.toLowerCase();
+      return matchesManufacturer && matchesType && matchesScanner && matchesLocation;
+    });
+  }, [manufacturerScanEventsWithLocation, manufacturerFilter, typeFilter, scannerFilter, locationFilter]);
 
-    const csvData = scanEventsWithLocation.map((event) => [
-      event.product?.name || "N/A",
-      event.product?.manufacturer || "N/A",
-      event.product?.barcode || "N/A",
-      event.product?.type || "N/A",
-      `${event.scanner.firstname} ${event.scanner.lastname}`,
-      event.scanner.email,
-      event.location || "N/A",
-      event.latitude,
-      event.longitude,
-      event.quantity || "N/A",
-      format(new Date(event.scannedAt as any), "yyyy-MM-dd HH:mm:ss"),
-    ]);
+  // Aggregate scan events by product and sum quantities
+  const aggregatedProductStats = useMemo(() => {
+    return filteredScanEvents.reduce((acc, event) => {
+      if (!event.product) return acc;
+      const productName = event.product.name || "Unknown";
+      const existingProduct = acc.find((item) => item.productName === productName);
+      if (existingProduct) {
+        existingProduct.count += event.quantity || 0;
+      } else {
+        acc.push({
+          productName: productName,
+          count: event.quantity || 0,
+        });
+      }
+      return acc;
+    }, [] as { productName: string; count: number }[]);
+  }, [filteredScanEvents]);
 
-    const csvContent = [
-      headers.join(","),
-      ...csvData.map((row) =>
-        row
-          .map((field) => `"${field?.toString().replace(/"/g, '""')}"`)
-          .join(","),
-      ),
-    ].join("\n");
+  // Aggregate scan events by product type and sum quantities
+  const aggregatedTypeStats = useMemo(() => {
+    return filteredScanEvents.reduce((acc, event) => {
+      if (!event.product) return acc;
+      const productType = event.product.type || "Unknown";
+      const existingType = acc.find((item) => item.type === productType);
+      if (existingType) {
+        existingType.count += event.quantity || 0;
+      } else {
+        acc.push({
+          type: productType,
+          count: event.quantity || 0,
+        });
+      }
+      return acc;
+    }, [] as { type: string; count: number }[]);
+  }, [filteredScanEvents]);
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
+  // Aggregate scan events by location and sum quantities
+  const aggregatedLocationStats = useMemo(() => {
+    return filteredScanEvents.reduce((acc, event) => {
+      const location = event.location || "Unknown";
+      const existingLocation = acc.find((item) => item.location === location);
+      if (existingLocation) {
+        existingLocation.count += event.quantity || 0;
+      } else {
+        acc.push({
+          location: location,
+          count: event.quantity || 0,
+        });
+      }
+      return acc;
+    }, [] as { location: string; count: number }[]);
+  }, [filteredScanEvents]);
+
+  // Aggregate scan events by scanner and sum quantities
+  const aggregatedScannerStats = useMemo(() => {
+    return filteredScanEvents.reduce((acc, event) => {
+      const scannerName = `${event.scanner.firstname} ${event.scanner.lastname}`;
+      const existingScanner = acc.find((item) => item.scannerName === scannerName);
+      if (existingScanner) {
+        existingScanner.count += event.quantity || 0;
+      } else {
+        acc.push({
+          scannerName: scannerName,
+          count: event.quantity || 0,
+        });
+      }
+      return acc;
+    }, [] as { scannerName: string; count: number }[]);
+  }, [filteredScanEvents]);
+
+  // Calculate total quantities from scanEventsWithLocation grouped by manufacturer
+  const getScanEventsQuantitiesByManufacturer = useMemo(() => {
+    const quantities: Record<string, number> = {};
+    filteredScanEvents.forEach((event) => {
+      const manufacturer = event.product?.manufacturer;
+      if (manufacturer) {
+        quantities[manufacturer] = (quantities[manufacturer] || 0) + (event.quantity || 0);
+      }
+    });
+    return quantities;
+  }, [filteredScanEvents]);
+
+  // Calculate total quantities from manufacturerScanEventsWithLocation grouped by manufacturer
+  const getTable2QuantitiesByManufacturer = useMemo(() => {
+    const quantities: Record<string, number> = {};
+    filteredManufacturerScanEvents.forEach((event) => {
+      const manufacturer = event.manufacturer?.name;
+      if (manufacturer) {
+        quantities[manufacturer] = (quantities[manufacturer] || 0) + (event.quantity || 0);
+      }
+    });
+    return quantities;
+  }, [filteredManufacturerScanEvents]);
+
+  // Get all unique manufacturers
+  const getAllManufacturers = useMemo(() => {
+    const table1Manufacturers = scanEventsWithLocation
+      .map(event => event.product?.manufacturer)
+      .filter(manufacturer => manufacturer && manufacturer !== "N/A");
+    const table2Manufacturers = manufacturerScanEventsWithLocation
+      .map(event => event.manufacturer?.name)
+      .filter(manufacturer => manufacturer && manufacturer !== "N/A");
+    const allManufacturers = [...new Set([...table1Manufacturers, ...table2Manufacturers])];
+    const uniqueManufacturersMap = new Map();
+    allManufacturers.forEach(manufacturer => {
+      const normalized = manufacturer.toLowerCase();
+      if (!uniqueManufacturersMap.has(normalized)) {
+        uniqueManufacturersMap.set(normalized, manufacturer);
+      }
+    });
+    return Array.from(uniqueManufacturersMap.values());
+  }, [scanEventsWithLocation, manufacturerScanEventsWithLocation]);
+
+  // Get all unique types
+  const getAllTypes = useMemo(() => {
+    const table1Types = scanEventsWithLocation
+      .map(event => event.product?.type)
+      .filter(type => type && type !== "N/A");
+    const table2Types = manufacturerScanEventsWithLocation
+      .map(event => event.product?.type)
+      .filter(type => type && type !== "N/A");
+    const allTypes = [...new Set([...table1Types, ...table2Types])];
+    return allTypes;
+  }, [scanEventsWithLocation, manufacturerScanEventsWithLocation]);
+
+  // Get all unique scanners
+  const getAllScanners = useMemo(() => {
+    const table1Scanners = scanEventsWithLocation
+      .map(event => `${event.scanner.firstname} ${event.scanner.lastname}`)
+      .filter(Boolean);
+    const table2Scanners = manufacturerScanEventsWithLocation
+      .map(event => `${event.scanner.firstname} ${event.scanner.lastname}`)
+      .filter(Boolean);
+    const allScanners = [...new Set([...table1Scanners, ...table2Scanners])];
+    return allScanners;
+  }, [scanEventsWithLocation, manufacturerScanEventsWithLocation]);
+
+  // Get all unique locations
+  const getAllLocations = useMemo(() => {
+    const table1Locations = scanEventsWithLocation
+      .map(event => event.location)
+      .filter(location => location && location !== "N/A");
+    const table2Locations = manufacturerScanEventsWithLocation
+      .map(event => event.location)
+      .filter(location => location && location !== "N/A");
+    const allLocations = [...new Set([...table1Locations, ...table2Locations])];
+    return allLocations;
+  }, [scanEventsWithLocation, manufacturerScanEventsWithLocation]);
+
+  // Combine quantities from both tables
+  const getCombinedManufacturerQuantities = useMemo(() => {
+    const table1Quantities = getScanEventsQuantitiesByManufacturer;
+    const table2Quantities = getTable2QuantitiesByManufacturer;
+    const allManufacturers = getAllManufacturers;
+    if (allManufacturers.length === 0) return [];
+    const result = allManufacturers
+      .filter(manufacturer =>
+        manufacturerFilter === "all" ||
+        manufacturer.toLowerCase() === manufacturerFilter.toLowerCase()
+      )
+      .map((manufacturer) => {
+        const table1Qty = table1Quantities[manufacturer] || 0;
+        const table2Qty = table2Quantities[manufacturer] || 0;
+        const totalQty = table1Qty + table2Qty;
+        return {
+          manufacturer: manufacturer,
+          totalQuantity: totalQty
+        };
+      });
+    return result.sort((a, b) => b.totalQuantity - a.totalQuantity);
+  }, [getScanEventsQuantitiesByManufacturer, getTable2QuantitiesByManufacturer, getAllManufacturers, manufacturerFilter]);
+
+  // Export to CSV
+  const exportToCSV = () => {
+    const data = getCombinedManufacturerQuantities;
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += "Manufacturer,Total Quantity\n";
+    data.forEach((event) => {
+      const row = [
+        `"${event.manufacturer || "N/A"}"`,
+        event.totalQuantity,
+      ].join(",");
+      csvContent += row + "\n";
+    });
+    const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute(
-      "download",
-      `scan-reports-${format(new Date(), "yyyy-MM-dd")}.csv`,
-    );
-    link.style.visibility = "hidden";
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "top_manufacturers.csv");
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Aggregate scan events by product and sum quantities
-  const aggregatedProductStats = scanEventsWithLocation.reduce((acc, event) => {
-    if (!event.product) return acc;
-
-    const productName = event.product.name || "Unknown";
-    const existingProduct = acc.find((item) => item.productName === productName);
-
-    if (existingProduct) {
-      existingProduct.count += event.quantity || 0;
-    } else {
-      acc.push({
-        productName: productName,
-        count: event.quantity || 0,
-      });
-    }
-
-    return acc;
-  }, [] as { productName: string; count: number }[]);
-
-  // Aggregate scan events by product type and sum quantities
-  const aggregatedTypeStats = scanEventsWithLocation.reduce((acc, event) => {
-    if (!event.product) return acc;
-
-    const productType = event.product.type || "Unknown";
-    const existingType = acc.find((item) => item.type === productType);
-
-    if (existingType) {
-      existingType.count += event.quantity || 0;
-    } else {
-      acc.push({
-        type: productType,
-        count: event.quantity || 0,
-      });
-    }
-
-    return acc;
-  }, [] as { type: string; count: number }[]);
-
-  // Aggregate scan events by location and sum quantities
-  const aggregatedLocationStats = scanEventsWithLocation.reduce((acc, event) => {
-    const location = event.location || "Unknown";
-    const existingLocation = acc.find((item) => item.location === location);
-
-    if (existingLocation) {
-      existingLocation.count += event.quantity || 0;
-    } else {
-      acc.push({
-        location: location,
-        count: event.quantity || 0,
-      });
-    }
-
-    return acc;
-  }, [] as { location: string; count: number }[]);
-
   return (
     <div className="container mx-auto space-y-6 py-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Scan Reports</h1>
-
-        <div className="flex items-center space-x-2">
-          <Button
-            onClick={handleExportCSV}
-            disabled={!scanEventsWithLocation.length}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export CSV
-          </Button>
-
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                id="date"
-                variant={"outline"}
-                className={cn(
-                  "w-[300px] justify-start text-left font-normal",
-                  !date && "text-muted-foreground",
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (
-                  date.to ? (
-                    <>
-                      {format(date.from, "LLL dd, y")} -{" "}
-                      {format(date.to, "LLL dd, y")}
-                    </>
-                  ) : (
-                    format(date.from, "LLL dd, y")
-                  )
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              id="date"
+              variant={"outline"}
+              className={cn(
+                "w-[300px] justify-start text-left font-normal",
+                !date && "text-muted-foreground",
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date?.from ? (
+                date.to ? (
+                  <>
+                    {format(date.from, "LLL dd, y")} -{" "}
+                    {format(date.to, "LLL dd, y")}
+                  </>
                 ) : (
-                  <span>Pick a date range</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={date?.from}
-                selected={date}
-                onSelect={handleDateSelect}
-                numberOfMonths={2}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+                  format(date.from, "LLL dd, y")
+                )
+              ) : (
+                <span>Pick a date range</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={date?.from}
+              selected={date}
+              onSelect={handleDateSelect}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
       </div>
-
       {error && (
         <div className="bg-destructive/15 text-destructive rounded-md p-4">
           Error loading reports: {error.message}
         </div>
       )}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4">
+        <Select onValueChange={setManufacturerFilter} value={manufacturerFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by Manufacturer" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Manufacturers</SelectItem>
+            {getAllManufacturers.map((manufacturer) => (
+              <SelectItem key={manufacturer} value={manufacturer}>
+                {manufacturer}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select onValueChange={setTypeFilter} value={typeFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {getAllTypes.map((type) => (
+              <SelectItem key={type} value={type}>
+                {type}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select onValueChange={setScannerFilter} value={scannerFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by Scanner" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Scanners</SelectItem>
+            {getAllScanners.map((scanner) => (
+              <SelectItem key={scanner} value={scanner}>
+                {scanner}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select onValueChange={setLocationFilter} value={locationFilter}>
+          <SelectTrigger className="w-[200px]">
+            <SelectValue placeholder="Filter by Location" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Locations</SelectItem>
+            {getAllLocations.map((location) => (
+              <SelectItem key={location} value={location}>
+                {location}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* Charts Section */}
       {isLoading ? (
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 5 }).map((_, i) => (
             <Card key={i}>
               <CardHeader>
                 <Skeleton className="h-6 w-32" />
@@ -320,7 +540,7 @@ export default function ReportsPage() {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={reportData.scannerStats || []}>
+                <BarChart data={aggregatedScannerStats || []}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="scannerName" />
                   <YAxis />
@@ -331,7 +551,6 @@ export default function ReportsPage() {
               </ResponsiveContainer>
             </CardContent>
           </Card>
-
           {/* Scans by Product Type */}
           <Card>
             <CardHeader>
@@ -378,7 +597,55 @@ export default function ReportsPage() {
               )}
             </CardContent>
           </Card>
-
+          {/* Top Scanned Manufacturer (Graph) */}
+          <Card className="md:col-span-2">
+            <CardHeader>
+              <CardTitle>Top Scanned Manufacturer</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {manufacturerError && (
+                <div className="bg-destructive/15 text-destructive rounded-md p-4 mb-4">
+                  Error loading manufacturer data: {manufacturerError.message}
+                </div>
+              )}
+              {isManufacturerLoading ? (
+                <div className="rounded-md border">
+                  <Skeleton className="h-64 w-full" />
+                </div>
+              ) : getCombinedManufacturerQuantities.length > 0 ? (
+                <div className="rounded-md border">
+                  <div className="flex justify-end p-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={exportToCSV}
+                      className="gap-1"
+                    >
+                      <Download className="h-4 w-4" />
+                      Export CSV
+                    </Button>
+                  </div>
+                  <ResponsiveContainer width="100%" height={400}>
+                    <BarChart
+                      data={getCombinedManufacturerQuantities}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="manufacturer" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="totalQuantity" fill="#8884d8" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="flex h-64 items-center justify-center">
+                  <p className="text-muted-foreground">No manufacturer data available</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
           {/* Top Products */}
           <Card>
             <CardHeader>
@@ -412,8 +679,7 @@ export default function ReportsPage() {
               )}
             </CardContent>
           </Card>
-
-          {/* Scans by Location (MODIFIED) */}
+          {/* Scans by Location */}
           <Card>
             <CardHeader>
               <CardTitle>Scans by Location</CardTitle>
@@ -439,137 +705,6 @@ export default function ReportsPage() {
           </Card>
         </div>
       ) : null}
-
-      {/* Data Table */}
-      {isLoading ? (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product name</TableHead>
-                <TableHead>Manufacturer</TableHead>
-                <TableHead>Barcode</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Scanner</TableHead>
-                <TableHead>Scanner Email</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Latitude</TableHead>
-                <TableHead>Longitude</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Scanned At</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-16" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-24" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-32" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-20" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-16" />
-                  </TableCell>
-                  <TableCell>
-                    <Skeleton className="h-4 w-24" />
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : scanEventsWithLocation.length > 0 ? (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Product</TableHead>
-                <TableHead>Manufacturer</TableHead>
-                <TableHead>Barcode</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Scanner</TableHead>
-                <TableHead>Scanner Email</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Latitude</TableHead>
-                <TableHead>Longitude</TableHead>
-                <TableHead>Quantity</TableHead>
-                <TableHead>Scanned At</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {scanEventsWithLocation.map((event) => (
-                <TableRow key={event.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-3">
-                      {event.product?.image && (
-                        <img
-                          src={event.product.image}
-                          alt={event.product.name || "Product image"}
-                          className="h-10 w-10 rounded-md object-cover"
-                        />
-                      )}
-                      <span>{event.product?.name || "N/A"}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>{event.product?.manufacturer || "N/A"}</TableCell>
-                  <TableCell>{event.product?.barcode || "N/A"}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {event.product?.type || "N/A"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {event.scanner.firstname} {event.scanner.lastname}
-                  </TableCell>
-                  <TableCell>{event.scanner.email}</TableCell>
-                  <TableCell>{event.location || "N/A"}</TableCell>
-                  <TableCell>
-                    {event.latitude ? event.latitude : "N/A"}
-                  </TableCell>
-                  <TableCell>
-                    {event.longitude ? event.longitude : "N/A"}
-                  </TableCell>
-                  <TableCell>{event.quantity || "N/A"}</TableCell>
-                  <TableCell>
-                    {format(
-                      new Date(event.scannedAt as any),
-                      "MMM dd, yyyy HH:mm",
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="py-12 text-center">
-          <p className="text-muted-foreground">
-            No scan events found for the selected date range.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
