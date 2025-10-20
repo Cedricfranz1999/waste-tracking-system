@@ -263,14 +263,17 @@ export default function ScannerEventsPage() {
     (event) => event.id === selectedEventId
   );
 
-  const exportToCSV = (table: "table1" | "table2") => {
+  const exportToCSV = (table: "table1" | "table2" | "table3") => {
     let data, filename;
     if (table === "table1") {
       data = scanEventsWithLocation.filter(event => event.product?.manufacturer && event.product.manufacturer !== "N/A");
       filename = "scan_events_table1.csv";
-    } else {
+    } else if (table === "table2") {
       data = manufacturerScanEventsWithLocation.filter(event => event.manufacturer?.name && event.manufacturer.name !== "N/A");
       filename = "scan_events_table2.csv";
+    } else {
+      data = manufacturerScanEventsWithLocation.filter(event => event.manufacturer?.name && event.manufacturer.name !== "N/A");
+      filename = "scan_events_table3.csv";
     }
     let csvContent = "data:text/csv;charset=utf-8,";
     if (table === "table1") {
@@ -281,6 +284,21 @@ export default function ScannerEventsPage() {
           `"${event.product?.manufacturer || "N/A"}"`,
           `"${event.product?.barcode || "N/A"}"`,
           `"${event.product?.type || "N/A"}"`,
+          `"${event.scanner.firstname} ${event.scanner.lastname}"`,
+          event.quantity,
+          `"${format(new Date(event.scannedAt), "MMM dd, yyyy HH:mm")}"`,
+          event.latitude || "N/A",
+          event.longitude || "N/A",
+          `"${event.location || "N/A"}"`,
+        ].join(",");
+        csvContent += row + "\n";
+      });
+    } else if (table === "table2") {
+      csvContent += "Manufacturer,Barcode,Scanner,Quantity,Scanned At,Latitude,Longitude,Location\n";
+      data.forEach((event) => {
+        const row = [
+          `"${event.manufacturer?.name || "N/A"}"`,
+          `"${event.manufacturer?.barcode || "N/A"}"`,
           `"${event.scanner.firstname} ${event.scanner.lastname}"`,
           event.quantity,
           `"${format(new Date(event.scannedAt), "MMM dd, yyyy HH:mm")}"`,
@@ -371,6 +389,7 @@ export default function ScannerEventsPage() {
           </Popover>
         </div>
       </div>
+
       {/* Filters */}
       <div className="flex space-x-4">
         <Select onValueChange={setManufacturerFilter} value={manufacturerFilter}>
@@ -413,6 +432,7 @@ export default function ScannerEventsPage() {
           </SelectContent>
         </Select>
       </div>
+
       {/* Scanner Events Table */}
       {error && (
         <div className="bg-destructive/15 text-destructive rounded-md p-4">
@@ -534,9 +554,105 @@ export default function ScannerEventsPage() {
           </p>
         </div>
       )}
-      {/* Scan by Manufacturer Table */}
+
+      {/* Manufacturer Scan Events Table */}
       <div className="mt-12">
-        <h2 className="text-2xl font-bold mb-4">Scan by Manufacturer</h2>
+        <h2 className="text-2xl font-bold mb-4">Manufacturer Scan Events</h2>
+        {manufacturerError && (
+          <div className="bg-destructive/15 text-destructive rounded-md p-4">
+            Error loading manufacturer scan events: {manufacturerError.message}
+          </div>
+        )}
+        {isManufacturerLoading ? (
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Manufacturer</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Scanned At</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell>
+                      <Skeleton className="h-4 w-32" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-12" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-24" />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton className="h-4 w-16" />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : filteredManufacturerScanEvents.length > 0 ? (
+          <div className="rounded-md border">
+            <div className="flex justify-end p-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => exportToCSV("table3")}
+                className="gap-1"
+              >
+                <Download className="h-4 w-4" />
+                Export CSV
+              </Button>
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Manufacturer</TableHead>
+                  <TableHead>Scanner</TableHead>
+                  <TableHead>Quantity</TableHead>
+                  <TableHead>Scanned At</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredManufacturerScanEvents.map((event: any) => (
+                  <TableRow key={event.id}>
+                    <TableCell className="font-medium">
+                      {event.manufacturer?.name}
+                    </TableCell>
+                    <TableCell>
+                      {event.scanner.firstname} {event.scanner.lastname}
+                    </TableCell>
+                    <TableCell>{event.quantity}</TableCell>
+                    <TableCell>
+                      {format(new Date(event.scannedAt), "MMM dd, yyyy HH:mm")}
+                    </TableCell>
+                  
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        ) : (
+          <div className="py-12 text-center">
+            <p className="text-muted-foreground">
+              No manufacturer scan events found for the selected date range.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Scan by Manufacturer Total Table */}
+      <div className="mt-12">
+        <h2 className="text-2xl font-bold mb-4">Scan by Manufacturer Total</h2>
         {manufacturerError && (
           <div className="bg-destructive/15 text-destructive rounded-md p-4">
             Error loading manufacturer scan events: {manufacturerError.message}
@@ -613,6 +729,7 @@ export default function ScannerEventsPage() {
           </div>
         )}
       </div>
+
       {/* Modal for Event Details */}
       <Dialog open={isModalOpen} onOpenChange={closeModal}>
         <DialogContent className="sm:max-w-[1000px]">

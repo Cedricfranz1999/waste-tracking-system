@@ -615,15 +615,7 @@ export default function ReportsPage() {
               ) : getCombinedManufacturerQuantities.length > 0 ? (
                 <div className="rounded-md border">
                   <div className="flex justify-end p-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={exportToCSV}
-                      className="gap-1"
-                    >
-                      <Download className="h-4 w-4" />
-                      Export CSV
-                    </Button>
+                   
                   </div>
                   <ResponsiveContainer width="100%" height={400}>
                     <BarChart
