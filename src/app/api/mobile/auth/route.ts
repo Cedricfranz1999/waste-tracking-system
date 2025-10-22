@@ -57,6 +57,7 @@ export async function GET(req: Request) {
 
     if (authHeader && authHeader.startsWith("Bearer ")) {
       const token = authHeader.split(" ")[1]
+      console.log("Token:", token);
       if (token) {
         const decoded: any = jwt.verify(token, secret)
 
@@ -78,6 +79,7 @@ export async function GET(req: Request) {
     }
     return NextResponse.json({ message: "Unauthorize" }, { status: 401 });
   } catch (error) {
-    return NextResponse.json(error, { status: 500 });
+    console.error(error)
+    return NextResponse.json(error, { status: 401 });
   }
 }

@@ -46,6 +46,39 @@ export async function POST(req: Request) {
                 barcode: code
               }
             })
+          }else {
+            const manufacturer = await db.manufacturer.findFirst({
+              where: {
+                barcode: {
+                  contains: Buffer.from(code, "utf-8").toString("base64")
+                }
+              }
+            })
+            if (manufacturer) {
+              const event = await db.scanEvent.create({
+                data: {
+                  scannerId: decoded?.id,
+                  manufacturerId: manufacturer.id,
+                  latitude: lat.toString(),
+                  longitude: lng.toString(),
+                  quantity: Number(qty)
+                },
+                include: {
+                  manufacturer: true
+                }
+              })
+
+              return NextResponse.json({
+                ...event,
+                manufacturer: {
+                  ...event.manufacturer,
+                  // manufacturer: safeDecode(event.manufacturer?.name || null),
+                  name: safeDecode(event.manufacturer?.name || null),
+                  // description: safeDecode(event.product?.description || null),
+                  barcode: code
+                }
+              })
+            }
           }
           console.log(product, 'waray')
         }
@@ -75,7 +108,7 @@ export async function GET(req: NextRequest) {
             where: { 
               scannerId: decoded?.id
             },
-            include: { product: true },
+            include: { product: true, manufacturer: true },
             take: Number(take),
             skip: Number(skip)
           })
@@ -89,13 +122,18 @@ export async function GET(req: NextRequest) {
           return NextResponse.json({
             rows: data.map((d) => ({
               ...d,
-              product: {
+              product: d?.product ? {
                 ...d.product,
                 manufacturer: safeDecode(d.product?.manufacturer || null),
                 name: safeDecode(d.product?.name || null),
                 description: safeDecode(d.product?.description || null),
                 barcode: safeDecode(d?.product?.barcode||null)
-              }
+              } : null,
+              manufacturer: d?.manufacturer ? {
+                ...d.manufacturer,
+                name: safeDecode(d.manufacturer?.name || null),
+                barcode: safeDecode(d?.manufacturer?.barcode||null)
+              } : null
             })),
             total
           })
