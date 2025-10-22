@@ -632,7 +632,7 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </div>
               ) : (
-                <div className="flex h-64 items-center justify-center">
+                <div className="flex h-64 items-center  justify-center">
                   <p className="text-muted-foreground">No manufacturer data available</p>
                 </div>
               )}
