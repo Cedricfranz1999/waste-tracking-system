@@ -81,11 +81,9 @@ export const scannerRouter = createTRPCRouter({
       return ctx.db.scanner.create({ data: encodedData });
     }),
   getAll: publicProcedure.query(async ({ ctx }) => {
-    const scanners = await ctx.db.scanner.findMany({
-      // where: {
-      //   email: JSON.stringify(encodeToBase64WithMarkers("johndoe@gmail.com")),
-      // },
-    });
+    const scanners = await ctx.db.scanner.findMany({orderBy:{
+      createdAt:"desc"
+    }});
     return scanners.map((scanner) => ({
       ...scanner,
       image: safeDecode(scanner.image),
@@ -97,6 +95,7 @@ export const scannerRouter = createTRPCRouter({
       address: safeDecode(scanner.address),
       gender: safeDecode(scanner.gender),
       birthdate: safeDecode(scanner.birthdate),
+      
     }));
   }),
   getById: publicProcedure
@@ -121,7 +120,7 @@ export const scannerRouter = createTRPCRouter({
         email: safeDecode(scanner.email),
         address: safeDecode(scanner.address),
         gender: safeDecode(scanner.gender),
-        birthdate: safeDecode(scanner.birthdate),
+        birthdate: safeDecode(scanner.birthdate), // Fixed: now decoding birthdate
       };
       const validationErrors = [
         decodedScanner.image,
@@ -132,7 +131,7 @@ export const scannerRouter = createTRPCRouter({
         decodedScanner.email,
         decodedScanner.address,
         decodedScanner.gender,
-        decodedScanner.birthdate,
+        decodedScanner.birthdate, // Added to validation check
       ].some((value) => value?.includes("Edited Data"));
       if (validationErrors) {
         throw new TRPCError({

@@ -149,37 +149,41 @@ export default function ProductsPage() {
       product.description?.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
-  const onSubmit = async (data: ProductFormData) => {
-    setIsSubmitting(true);
-    try {
-      let imageUrl = data.image;
-      if (selectedFile) {
-        imageUrl = await uploadImage(selectedFile);
-      }
-      if (editingProduct) {
-        await updateMutation.mutateAsync({
-          id: editingProduct.id,
-          ...data,
-          image: imageUrl,
-        });
-      } else {
-        await createMutation.mutateAsync({
-          ...data,
-          image: imageUrl,
-        });
-      }
-      await refetch();
-      setIsDialogOpen(false);
-      setEditingProduct(null);
-      form.reset();
-      setSelectedFile(null);
-      setImagePreview("");
-    } catch (error) {
-      console.error("Error saving product:", error);
-    } finally {
-      setIsSubmitting(false);
+const onSubmit = async (data: ProductFormData) => {
+  setIsSubmitting(true);
+  try {
+    let imageUrl = data.image;
+    if (selectedFile) {
+      imageUrl = await uploadImage(selectedFile);
     }
-  };
+    
+    // Trim barcode before saving
+    const trimmedData = {
+      ...data,
+      barcode: data.barcode.trim(),
+      image: imageUrl,
+    };
+
+    if (editingProduct) {
+      await updateMutation.mutateAsync({
+        id: editingProduct.id,
+        ...trimmedData,
+      });
+    } else {
+      await createMutation.mutateAsync(trimmedData);
+    }
+    await refetch();
+    setIsDialogOpen(false);
+    setEditingProduct(null);
+    form.reset();
+    setSelectedFile(null);
+    setImagePreview("");
+  } catch (error) {
+    console.error("Error saving product:", error);
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
@@ -208,7 +212,7 @@ export default function ProductsPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Products</CardTitle>
-              <CardDescription>Manage your product inventory</CardDescription>
+              <CardDescription>Manage your product cms</CardDescription>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
@@ -426,7 +430,7 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col items-center">
-                        <Barcode value={product.barcode as any} />
+    <Barcode value={product?.barcode?.trim() as any} />
                         <span className="mt-1 text-xs">{product.barcode}</span>
                       </div>
                     </TableCell>
