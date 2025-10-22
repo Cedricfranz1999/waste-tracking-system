@@ -230,10 +230,10 @@ export default function ScannersPage() {
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button onClick={() => setEditingScanner(null)}>
+                {/* <Button onClick={() => setEditingScanner(null)}>
                   <Plus className="mr-2 h-4 w-4" />
                   Add Scanner
-                </Button>
+                </Button> */}
               </DialogTrigger>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
@@ -467,7 +467,7 @@ export default function ScannersPage() {
                   <TableHead>Gender</TableHead>
                   <TableHead>Birthdate</TableHead>
                   <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {/* <TableHead className="text-right">Actions</TableHead> */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -547,7 +547,7 @@ export default function ScannersPage() {
                     <TableCell>
                       {scanner.createdAt.toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-right">
+                    {/* <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
@@ -569,7 +569,7 @@ export default function ScannersPage() {
                           )}
                         </Button>
                       </div>
-                    </TableCell>
+                    </TableCell> */}
                   </TableRow>
                 ))}
               </TableBody>
