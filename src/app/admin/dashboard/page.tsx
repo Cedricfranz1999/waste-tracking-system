@@ -117,13 +117,7 @@ export default function Dashboard() {
       {/* Original Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          {
-            icon: <Users className="h-5 w-5 text-blue-500" />,
-            title: "Total Scanners",
-            value: counts?.scanners || 0,
-            description: "Registered scanning devices",
-            color: "bg-blue-50 hover:bg-blue-100",
-          },
+       
           {
             icon: <Package className="h-5 w-5 text-green-500" />,
             title: "Total Products",

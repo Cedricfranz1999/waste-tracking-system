@@ -1,13 +1,18 @@
-// utils/geocode.ts
 export async function reverseGeocode(lat: string, lon: string): Promise<string> {
   try {
-    const response = await fetch(
-      `/api/reverse-geocode?lat=${lat}&lon=${lon}`,
-    );
+    const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
     const data = await response.json();
-    return data.display_name || "View in Map";
+    const address = data.address || {};
+
+    // Strictly return barangay from the response
+    return (
+      address.barangay ||
+      address.village ||      // secondary fallback if barangay missing
+      address.suburb ||       // optional fallback
+      "Unknown Barangay"
+    );
   } catch (error) {
     console.error("Reverse geocoding failed:", error);
-    return "View";
+    return "Unknown Barangay";
   }
 }
