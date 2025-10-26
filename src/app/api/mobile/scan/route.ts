@@ -6,6 +6,28 @@ import jwt from 'jsonwebtoken'
 
 const secret = process.env.JWT_SECRET || 'secret'
 
+const decodeImage = (imageData: any): string | null => {
+  if (!imageData) return null;
+  
+  try {
+    if (typeof imageData === 'object' && imageData.value && imageData.$ && imageData.$$) {
+      return Buffer.from(imageData.value, 'base64').toString('utf8');
+    }
+    
+    if (typeof imageData === 'string') {
+      const parsed = JSON.parse(imageData);
+      if (parsed && parsed.value && parsed.$ && parsed.$$) {
+        return Buffer.from(parsed.value, 'base64').toString('utf8');
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error decoding image:', error);
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const { code, lat, lng, qty } = await req.json();
@@ -43,22 +65,23 @@ export async function POST(req: Request) {
                 manufacturer: safeDecode(event.product?.manufacturer || null),
                 name: safeDecode(event.product?.name || null),
                 description: safeDecode(event.product?.description || null),
+                image: decodeImage(event.product?.image), 
                 barcode: code
               }
             })
-          }else {
-            const manufacturer = await db.manufacturer.findFirst({
-              where: {
-                barcode: {
-                  contains: Buffer.from(code, "utf-8").toString("base64")
-                }
-              }
+          } else {
+            const allManufacturers = await db.manufacturer.findMany()
+            
+            const matchingManufacturer = allManufacturers.find(manufacturer => {
+              const decodedManufacturerBarcode = safeDecode(manufacturer.barcode);
+              return decodedManufacturerBarcode && code.startsWith(decodedManufacturerBarcode);
             })
-            if (manufacturer) {
+            
+            if (matchingManufacturer) {
               const event = await db.scanEvent.create({
                 data: {
                   scannerId: decoded?.id,
-                  manufacturerId: manufacturer.id,
+                  manufacturerId: matchingManufacturer.id,
                   latitude: lat.toString(),
                   longitude: lng.toString(),
                   quantity: Number(qty)
@@ -72,10 +95,8 @@ export async function POST(req: Request) {
                 ...event,
                 manufacturer: {
                   ...event.manufacturer,
-                  // manufacturer: safeDecode(event.manufacturer?.name || null),
                   name: safeDecode(event.manufacturer?.name || null),
-                  // description: safeDecode(event.product?.description || null),
-                  barcode: code
+                  barcode: safeDecode(matchingManufacturer.barcode) // Use the actual manufacturer barcode
                 }
               })
             }
@@ -109,11 +130,12 @@ export async function GET(req: NextRequest) {
               scannerId: decoded?.id
             },
             include: { product: true, manufacturer: true },
-            take: Number(take),
-            skip: Number(skip)
+            take: Number(take) || 10,
+            skip: Number(skip) || 0,
+            orderBy: { scannedAt: 'desc' }
           })
 
-          const total = await db.scanEvent.findMany({
+          const total = await db.scanEvent.count({
             where: { 
               scannerId: decoded?.id
             }
@@ -127,6 +149,7 @@ export async function GET(req: NextRequest) {
                 manufacturer: safeDecode(d.product?.manufacturer || null),
                 name: safeDecode(d.product?.name || null),
                 description: safeDecode(d.product?.description || null),
+                image: decodeImage(d.product?.image), 
                 barcode: safeDecode(d?.product?.barcode||null)
               } : null,
               manufacturer: d?.manufacturer ? {
@@ -135,7 +158,7 @@ export async function GET(req: NextRequest) {
                 barcode: safeDecode(d?.manufacturer?.barcode||null)
               } : null
             })),
-            total
+            total: total
           })
         }
       }
