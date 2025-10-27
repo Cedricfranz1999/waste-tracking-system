@@ -240,7 +240,7 @@ export async function reverseGeocode(lat: string, lon: string): Promise<string> 
     }
 
     // ✅ Return full address if not Calbayog or no match
-    return data.display_name || "Unknown Location";
+    return data.display_name || "View Map";
     
   } catch (error) {
     console.error("Reverse geocoding failed:", error);

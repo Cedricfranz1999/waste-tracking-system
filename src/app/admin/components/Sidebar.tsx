@@ -88,7 +88,7 @@ const Sidebar = () => {
                   }`}
                 >
                   <Users2 className="h-4 w-4" />
-                  Scanner Profile
+                  User Profile
                 </Link>
               </div>
             </motion.div>
