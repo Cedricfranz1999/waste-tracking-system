@@ -47,7 +47,6 @@ export default function ScannerEventsPage() {
   const [scannerFilter, setScannerFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState<string>("");
-
   const {
     data: scanEvents,
     isLoading,
@@ -59,9 +58,8 @@ export default function ScannerEventsPage() {
     },
     {
       enabled: !!date?.from && !!date?.to,
-    },
+    }
   );
-
   const {
     data: manufacturerScanEvents,
     isLoading: isManufacturerLoading,
@@ -73,9 +71,8 @@ export default function ScannerEventsPage() {
     },
     {
       enabled: !!date?.from && !!date?.to,
-    },
+    }
   );
-
   const [scanEventsWithLocation, setScanEventsWithLocation] = useState<any[]>([]);
   const [manufacturerScanEventsWithLocation, setManufacturerScanEventsWithLocation] = useState<any[]>([]);
   const [selectedManufacturer, setSelectedManufacturer] = useState<string | null>(null);
@@ -85,34 +82,10 @@ export default function ScannerEventsPage() {
     if (scanEvents && scanEvents.length > 0) {
       const initialEvents = scanEvents.map((event) => ({
         ...event,
-        locationLoading: !!event.latitude && !!event.longitude,
         location: null,
+        locationLoading: false,
       }));
       setScanEventsWithLocation(initialEvents);
-      initialEvents.forEach(async (event: any) => {
-        if (event.latitude && event.longitude) {
-          try {
-            const location = await reverseGeocode(event.latitude, event.longitude);
-            setScanEventsWithLocation((prev) =>
-              prev.map((e) =>
-                e.id === event.id ? { ...e, location, locationLoading: false } : e
-              )
-            );
-          } catch (err) {
-            setScanEventsWithLocation((prev) =>
-              prev.map((e) =>
-                e.id === event.id ? { ...e, locationLoading: false } : e
-              )
-            );
-          }
-        } else {
-          setScanEventsWithLocation((prev) =>
-            prev.map((e) =>
-              e.id === event.id ? { ...e, locationLoading: false } : e
-            )
-          );
-        }
-      });
     }
   }, [scanEvents]);
 
@@ -120,36 +93,37 @@ export default function ScannerEventsPage() {
     if (manufacturerScanEvents && manufacturerScanEvents.length > 0) {
       const initialEvents = manufacturerScanEvents.map((event) => ({
         ...event,
-        locationLoading: !!event.latitude && !!event.longitude,
         location: null,
+        locationLoading: false,
       }));
       setManufacturerScanEventsWithLocation(initialEvents);
-      initialEvents.forEach(async (event: any) => {
-        if (event.latitude && event.longitude) {
-          try {
-            const location = await reverseGeocode(event.latitude, event.longitude);
-            setManufacturerScanEventsWithLocation((prev) =>
-              prev.map((e) =>
-                e.id === event.id ? { ...e, location, locationLoading: false } : e
-              )
-            );
-          } catch (err) {
-            setManufacturerScanEventsWithLocation((prev) =>
-              prev.map((e) =>
-                e.id === event.id ? { ...e, locationLoading: false } : e
-              )
-            );
-          }
-        } else {
-          setManufacturerScanEventsWithLocation((prev) =>
-            prev.map((e) =>
-              e.id === event.id ? { ...e, locationLoading: false } : e
-            )
-          );
-        }
-      });
     }
   }, [manufacturerScanEvents]);
+
+  const loadLocationForEvent = async (event: any, setState: React.Dispatch<React.SetStateAction<any[]>>) => {
+    if (!event.latitude || !event.longitude) return;
+
+    setState((prev) =>
+      prev.map((e) =>
+        e.id === event.id ? { ...e, locationLoading: true } : e
+      )
+    );
+
+    try {
+      const location = await reverseGeocode(event.latitude, event.longitude);
+      setState((prev) =>
+        prev.map((e) =>
+          e.id === event.id ? { ...e, location, locationLoading: false } : e
+        )
+      );
+    } catch (err) {
+      setState((prev) =>
+        prev.map((e) =>
+          e.id === event.id ? { ...e, locationLoading: false } : e
+        )
+      );
+    }
+  };
 
   const getTable1QuantitiesByManufacturer = () => {
     if (!scanEventsWithLocation.length) return {};
@@ -217,7 +191,6 @@ export default function ScannerEventsPage() {
     const table2Quantities = getTable2QuantitiesByManufacturer();
     const allManufacturers = getAllManufacturers();
     if (allManufacturers.length === 0) return [];
-
     const result = allManufacturers
       .filter(manufacturer =>
         manufacturerFilter === "all" ||
@@ -236,7 +209,6 @@ export default function ScannerEventsPage() {
       .filter(manufacturer =>
         manufacturer.manufacturer.toLowerCase().includes(searchTerm.toLowerCase())
       );
-
     return result;
   };
 
@@ -280,7 +252,6 @@ export default function ScannerEventsPage() {
       data = getCombinedManufacturerQuantities();
       filename = "scan_events_table3.csv";
     }
-
     let csvContent = "data:text/csv;charset=utf-8,";
     if (table === "table1") {
       csvContent += "Product,Manufacturer,Barcode,Type,Scanner,Quantity,Scanned At,Latitude,Longitude,Location\n";
@@ -324,7 +295,6 @@ export default function ScannerEventsPage() {
         csvContent += row + "\n";
       });
     }
-
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -356,57 +326,54 @@ export default function ScannerEventsPage() {
 
   return (
     <div className="container mx-auto space-y-6 py-6">
-      
-  <div className="flex flex-wrap items-center justify-between gap-4 ">
-  <div className="relative">
-    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-    <Input
-      type="search"
-      placeholder="Search products/manufacturers..."
-      className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-    />
-  </div>
-  <div className="flex items-center gap-2">
-    <Popover>
-      <PopoverTrigger asChild>
-        <Button
-          variant={"outline"}
-          className={cn(
-            "w-[280px] justify-start text-left font-normal",
-            !date && "text-muted-foreground"
-          )}
-        >
-          <CalendarIcon className="mr-2 h-4 w-4" />
-          {date?.from ? (
-            date.to ? (
-              <>
-                {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-              </>
-            ) : (
-              format(date.from, "LLL dd, y")
-            )
-          ) : (
-            <span>Pick a date range</span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
-        <Calendar
-          initialFocus
-          mode="range"
-          defaultMonth={date?.from}
-          selected={date}
-          onSelect={handleDateSelect}
-          numberOfMonths={2}
-        />
-      </PopoverContent>
-    </Popover>
-  </div>
-</div>
-
-
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search products/manufacturers..."
+            className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-[280px] justify-start text-left font-normal",
+                  !date && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={handleDateSelect}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
+      </div>
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Select value={manufacturerFilter} onValueChange={setManufacturerFilter}>
@@ -423,7 +390,6 @@ export default function ScannerEventsPage() {
             </SelectContent>
           </Select>
         </div>
-
         <div className="flex items-center gap-2">
           <Select value={scannerFilter} onValueChange={setScannerFilter}>
             <SelectTrigger className="w-[180px]">
@@ -439,7 +405,6 @@ export default function ScannerEventsPage() {
             </SelectContent>
           </Select>
         </div>
-
         <div className="flex items-center gap-2">
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
@@ -456,7 +421,6 @@ export default function ScannerEventsPage() {
           </Select>
         </div>
       </div>
-
       <div className="mt-12">
         <h2 className="text-2xl font-bold mb-4">Scan by Manufacturer Total</h2>
         {manufacturerError && (
@@ -541,7 +505,6 @@ export default function ScannerEventsPage() {
           </div>
         )}
       </div>
-
       {/* Modal for Manufacturer Details */}
       <Dialog open={isModalOpen} onOpenChange={closeModal}>
         <DialogContent className="sm:max-w-[1000px] max-h-[80vh] overflow-y-auto">
@@ -596,19 +559,28 @@ export default function ScannerEventsPage() {
                               <Loader2 className="h-4 w-4 animate-spin" />
                               <span>Loading location...</span>
                             </div>
+                          ) : event.location ? (
+                            <Button
+                              variant="link"
+                              className="p-0 h-auto text-blue-500 hover:underline"
+                              onClick={() => openGoogleMaps(event.latitude, event.longitude)}
+                            >
+                              {event.location}
+                            </Button>
                           ) : (
                             <Button
                               variant="link"
                               className="p-0 h-auto text-blue-500 hover:underline"
-                              onClick={() =>
-                                openGoogleMaps(event.latitude, event.longitude)
-                              }
+                              onClick={() => {
+                                loadLocationForEvent(event, setScanEventsWithLocation);
+                                loadLocationForEvent(event, setManufacturerScanEventsWithLocation);
+                              }}
                             >
-                              {event.location || "View on map"}
+                              See location
                             </Button>
                           )
                         ) : (
-                          <p>{event.location || "N/A"}</p>
+                          <p>N/A</p>
                         )}
                       </TableCell>
                     </TableRow>
