@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import type { DateRange } from "react-day-picker";
-import { CalendarIcon, Loader2, Download } from "lucide-react";
+import { CalendarIcon, Loader2, Download, Search } from "lucide-react";
 import { Calendar } from "~/components/ui/calendar";
 import {
   Popover,
@@ -34,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { Input } from "~/components/ui/input";
 import { api } from "~/trpc/react";
 import { reverseGeocode } from "~/utils/geolocation";
 
@@ -45,6 +46,8 @@ export default function ScannerEventsPage() {
   const [manufacturerFilter, setManufacturerFilter] = useState<string>("all");
   const [scannerFilter, setScannerFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
+
   const {
     data: scanEvents,
     isLoading,
@@ -58,6 +61,7 @@ export default function ScannerEventsPage() {
       enabled: !!date?.from && !!date?.to,
     },
   );
+
   const {
     data: manufacturerScanEvents,
     isLoading: isManufacturerLoading,
@@ -71,6 +75,7 @@ export default function ScannerEventsPage() {
       enabled: !!date?.from && !!date?.to,
     },
   );
+
   const [scanEventsWithLocation, setScanEventsWithLocation] = useState<any[]>([]);
   const [manufacturerScanEventsWithLocation, setManufacturerScanEventsWithLocation] = useState<any[]>([]);
   const [selectedManufacturer, setSelectedManufacturer] = useState<string | null>(null);
@@ -212,6 +217,7 @@ export default function ScannerEventsPage() {
     const table2Quantities = getTable2QuantitiesByManufacturer();
     const allManufacturers = getAllManufacturers();
     if (allManufacturers.length === 0) return [];
+
     const result = allManufacturers
       .filter(manufacturer =>
         manufacturerFilter === "all" ||
@@ -226,7 +232,11 @@ export default function ScannerEventsPage() {
           manufacturer: manufacturer,
           totalQuantity: totalQty
         };
-      });
+      })
+      .filter(manufacturer =>
+        manufacturer.manufacturer.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+
     return result;
   };
 
@@ -270,6 +280,7 @@ export default function ScannerEventsPage() {
       data = getCombinedManufacturerQuantities();
       filename = "scan_events_table3.csv";
     }
+
     let csvContent = "data:text/csv;charset=utf-8,";
     if (table === "table1") {
       csvContent += "Product,Manufacturer,Barcode,Type,Scanner,Quantity,Scanned At,Latitude,Longitude,Location\n";
@@ -313,6 +324,7 @@ export default function ScannerEventsPage() {
         csvContent += row + "\n";
       });
     }
+
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
@@ -326,20 +338,125 @@ export default function ScannerEventsPage() {
     const manufacturerMatch = manufacturerFilter === "all" || event.product?.manufacturer?.toLowerCase() === manufacturerFilter.toLowerCase();
     const scannerMatch = scannerFilter === "all" || `${event.scanner.firstname} ${event.scanner.lastname}` === scannerFilter;
     const typeMatch = typeFilter === "all" || event.product?.type === typeFilter;
-    return manufacturerMatch && scannerMatch && typeMatch && event.product?.manufacturer && event.product.manufacturer !== "N/A";
+    const searchMatch = searchTerm === "" ||
+      event.product?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.product?.manufacturer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.product?.barcode.toLowerCase().includes(searchTerm.toLowerCase());
+    return manufacturerMatch && scannerMatch && typeMatch && searchMatch && event.product?.manufacturer && event.product.manufacturer !== "N/A";
   });
 
   const filteredManufacturerScanEvents = manufacturerScanEventsWithLocation.filter((event) => {
     const manufacturerMatch = manufacturerFilter === "all" || event.manufacturer?.name?.toLowerCase() === manufacturerFilter.toLowerCase();
     const scannerMatch = scannerFilter === "all" || `${event.scanner.firstname} ${event.scanner.lastname}` === scannerFilter;
-    return manufacturerMatch && scannerMatch && event.manufacturer?.name && event.manufacturer.name !== "N/A";
+    const searchMatch = searchTerm === "" ||
+      event.manufacturer?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.manufacturer?.barcode.toLowerCase().includes(searchTerm.toLowerCase());
+    return manufacturerMatch && scannerMatch && searchMatch && event.manufacturer?.name && event.manufacturer.name !== "N/A";
   });
 
   return (
     <div className="container mx-auto space-y-6 py-6">
-      {/* ... (previous JSX remains the same until the Scan by Manufacturer Total table) ... */}
+      
+  <div className="flex flex-wrap items-center justify-between gap-4 ">
+  <div className="relative">
+    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+    <Input
+      type="search"
+      placeholder="Search products/manufacturers..."
+      className="pl-8 sm:w-[300px] md:w-[200px] lg:w-[300px]"
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+    />
+  </div>
+  <div className="flex items-center gap-2">
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant={"outline"}
+          className={cn(
+            "w-[280px] justify-start text-left font-normal",
+            !date && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {date?.from ? (
+            date.to ? (
+              <>
+                {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+              </>
+            ) : (
+              format(date.from, "LLL dd, y")
+            )
+          ) : (
+            <span>Pick a date range</span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0">
+        <Calendar
+          initialFocus
+          mode="range"
+          defaultMonth={date?.from}
+          selected={date}
+          onSelect={handleDateSelect}
+          numberOfMonths={2}
+        />
+      </PopoverContent>
+    </Popover>
+  </div>
+</div>
 
-      {/* Scan by Manufacturer Total Table */}
+
+      <div className="flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <Select value={manufacturerFilter} onValueChange={setManufacturerFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by manufacturer" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Manufacturers</SelectItem>
+              {getAllManufacturers().map((manufacturer) => (
+                <SelectItem key={manufacturer} value={manufacturer}>
+                  {manufacturer}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select value={scannerFilter} onValueChange={setScannerFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by scanner" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Scanners</SelectItem>
+              {getAllScanners().map((scanner) => (
+                <SelectItem key={scanner} value={scanner}>
+                  {scanner}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              {getAllTypes().map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <div className="mt-12">
         <h2 className="text-2xl font-bold mb-4">Scan by Manufacturer Total</h2>
         {manufacturerError && (

@@ -1,68 +1,119 @@
-// Cache for geocoding results to avoid duplicate API calls
-const geocodingCache = new Map<string, string>();
+// ~/utils/geolocation.ts
 
-// Create cache key from coordinates
-const createCacheKey = (lat: string, lon: string): string => 
+// Enhanced cache with TTL and batch processing support
+const geocodingCache = new Map<string, { location: string; timestamp: number }>();
+const CACHE_TTL = 60 * 60 * 1000; // 1 hour
+const FAILURE_CACHE_TTL = 5 * 60 * 1000; // 5 minutes for failures
+
+// Batch processing queue
+const processingQueue: Array<{
+  lat: string;
+  lon: string;
+  resolve: (value: string) => void;
+  reject: (reason: any) => void;
+}> = [];
+let processing = false;
+
+const createCacheKey = (lat: string, lon: string): string =>
   `${parseFloat(lat).toFixed(6)},${parseFloat(lon).toFixed(6)}`;
+
+const processBatch = async () => {
+  if (processing || processingQueue.length === 0) return;
+
+  processing = true;
+  const batch = processingQueue.splice(0, 5); // Process 5 at a time
+
+  try {
+    const batchPromises = batch.map(async ({ lat, lon, resolve, reject }) => {
+      const cacheKey = createCacheKey(lat, lon);
+      const cached = geocodingCache.get(cacheKey);
+
+      // Check cache validity
+      if (cached) {
+        const isExpired = cached.timestamp < Date.now() -
+          (cached.location === "Unknown Location" ? FAILURE_CACHE_TTL : CACHE_TTL);
+
+        if (!isExpired) {
+          resolve(cached.location);
+          return;
+        }
+
+        geocodingCache.delete(cacheKey);
+      }
+
+      try {
+        const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
+
+        if (!response.ok) {
+          throw new Error(`Geocoding API responded with status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const displayName = data.display_name || "Unknown Location";
+
+        // Cache successful result
+        geocodingCache.set(cacheKey, {
+          location: displayName,
+          timestamp: Date.now()
+        });
+
+        resolve(displayName);
+      } catch (error) {
+        // Cache failure
+        geocodingCache.set(cacheKey, {
+          location: "Unknown Location",
+          timestamp: Date.now()
+        });
+        reject(error);
+      }
+    });
+
+    await Promise.allSettled(batchPromises);
+  } finally {
+    processing = false;
+
+    // Process next batch if any
+    if (processingQueue.length > 0) {
+      setTimeout(processBatch, 100); // Small delay between batches
+    }
+  }
+};
 
 export async function reverseGeocode(lat: string, lon: string): Promise<string> {
   const cacheKey = createCacheKey(lat, lon);
-  
-  // Check cache first
-  if (geocodingCache.has(cacheKey)) {
-    return geocodingCache.get(cacheKey)!;
-  }
+  const cached = geocodingCache.get(cacheKey);
 
-  try {
-    const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
-    
-    if (!response.ok) {
-      throw new Error(`Geocoding API responded with status: ${response.status}`);
+  // Return cached result if valid
+  if (cached) {
+    const isExpired = cached.timestamp < Date.now() -
+      (cached.location === "View in Map" ? FAILURE_CACHE_TTL : CACHE_TTL);
+
+    if (!isExpired) {
+      return cached.location;
     }
-    
-    const data = await response.json();
-    const displayName = data.display_name || "Unknown Location";
 
-    // Cache the result
-    geocodingCache.set(cacheKey, displayName);
-    
-    // Set timeout to clear cache after 1 hour to prevent memory leaks
-    setTimeout(() => {
-      geocodingCache.delete(cacheKey);
-    }, 60 * 60 * 1000);
-
-    return displayName;
-    
-  } catch (error) {
-    console.error("Reverse geocoding failed:", error);
-    
-    // Cache failures for 5 minutes to avoid repeated failures
-    geocodingCache.set(cacheKey, "Unknown Location");
-    setTimeout(() => {
-      geocodingCache.delete(cacheKey);
-    }, 5 * 60 * 1000);
-    
-    return "Unknown Location";
+    geocodingCache.delete(cacheKey);
   }
-}
 
-// If you need the full response data, create a separate function
-export async function reverseGeocodeFull(lat: string, lon: string): Promise<any> {
-  try {
-    const response = await fetch(`/api/reverse-geocode?lat=${lat}&lon=${lon}`);
-    
-    if (!response.ok) {
-      throw new Error(`Geocoding API responded with status: ${response.status}`);
+  // Add to processing queue
+  return new Promise((resolve, reject) => {
+    processingQueue.push({ lat, lon, resolve, reject });
+
+    if (!processing) {
+      setTimeout(processBatch, 0);
     }
-    
-    return await response.json();
-  } catch (error) {
-    console.error("Reverse geocoding failed:", error);
-    return { display_name: "Unknown Location" };
-  }
+  });
 }
 
 // Utility function to clear cache if needed
 export function clearGeocodingCache(): void {
   geocodingCache.clear();
+}
+
+// Get cache stats for debugging
+export function getGeocodingCacheStats() {
+  return {
+    size: geocodingCache.size,
+    keys: Array.from(geocodingCache.keys())
+  };
 }

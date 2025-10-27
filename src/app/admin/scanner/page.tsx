@@ -547,7 +547,7 @@ export default function ScannersPage() {
                     <TableCell>
                       {scanner.createdAt.toLocaleDateString()}
                     </TableCell>
-                    {/* <TableCell className="text-right">
+                    <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         <Button
                           variant="outline"
@@ -569,7 +569,7 @@ export default function ScannersPage() {
                           )}
                         </Button>
                       </div>
-                    </TableCell> */}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
